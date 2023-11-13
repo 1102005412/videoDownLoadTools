@@ -3,30 +3,76 @@ import re
 import math
 import time
 import os
+import threading
 
 class M3U8Downloader:
 
-    def __download_ts_list(self,tsList,outputPath):
-        allNum = len(tsList)
-        print("allNum = %d" % (allNum))
-        finished = 0
-        for ts in tsList:
-            fileName = ts.split('?')[0];
-            if(os.path.exists(outputPath + "/" + fileName)):
-                finished = finished + 1
-                print("%s已存在，跳过 (%d / %d)" % (fileName,finished,allNum))
+    def __init__(self):
+        self._downTaskLock = threading.Lock()
+        self._timeout = 30      #超时时间 单位：秒
+        self._retry = 5         #重试次数
+        self._threadCount = 10  #线程数
+
+    def __get_next_task(self):
+        task = []
+        self._downTaskLock.acquire()
+        hasFind = False
+        for i in range(self._currentIndex,self._allNum):
+            ts = self._tsList[i]
+            fileName = ts.split('?')[0]
+            if(os.path.exists(self._outputPath + "/" + fileName)):
+                self._finished = self._finished + 1
+                print("%s已存在，跳过 (%d / %d)" % (fileName,self._finished,self._allNum))
                 continue
+            
+            task = [self.__downUrl + ts, fileName]
+            hasFind = True
+            self._currentIndex = i + 1
+            break
+        if not hasFind:
+            self._currentIndex = self._allNum
+        self._downTaskLock.release()
+        return task
 
-            ret = self.__try_get_url(self.__downUrl + ts)
-            if(ret.status_code != 200):
-                print("%s下载失败%d，跳过 (%d/%d)" % (fileName,ret.status_code,finished,allNum))
+    def __download_task(self):
 
-            with open(outputPath + "/" + fileName, "ab") as code:
+        while(True):
+            task = self.__get_next_task()
+            if not task:
+                return
+
+            ret = self.__try_get_url(task[0])
+            if( ret == None or ret.status_code != 200):
+                self._downTaskLock.acquire()
+                print("%s下载失败%d，跳过 (%d/%d)" % (task[1],ret.status_code,self._finished,self._allNum))
+                self._downTaskLock.release()
+
+            with open(self._outputPath + "/" + task[1], "ab") as code:
                 code.write(ret.content)
-                finished = finished + 1
-                print("%s下载成功 (%d/%d)" % (fileName,finished,allNum))
+                self._downTaskLock.acquire()
+                self._finished = self._finished + 1
+                print("%s下载成功 (%d/%d)" % (task[1],self._finished,self._allNum))
+                self._downTaskLock.release()
+
+
+    def __download_ts_list(self,tsList,outputPath):
+        self._allNum = len(tsList)
+        self._currentIndex = 0
+        self._tsList = tsList
+        self._finished = 0
+        self._outputPath = outputPath
+        print("allNum = %d" % (self._allNum))
+
+        threadList = []
+        for i in range(self._threadCount):
+            t = threading.Thread(target=self.__download_task)
+            t.start()
+            threadList.append(t)
         
-        print("%s下载完成" % (outputPath))
+        for t in threadList:
+            t.join()
+
+        print("%s下载完成 %d/%d" % (outputPath,self._finished,self._allNum))
         
 
 
@@ -44,13 +90,29 @@ class M3U8Downloader:
         while True:
             try:
                 count += 1
+                if count > self._retry:
+                    break
+
                 print("第%d次尝试..." % (count))
-                res = requests.get(url)
+                res = requests.get(url,timeout=self._timeout)
+                if res == None or res.status_code != 200:
+                    continue
+                
+                lengthStr = res.headers.get('Content-Length')
+                if lengthStr:
+                    length = int(lengthStr)
+                    if length != len(res.content):
+                        print("check data error,retry!")
+                        continue
+                else:
+                    print("%s:%d why come here?" % (__file__,__line__))
+                
                 return res
             except Exception as e:
                 print("we catch an exception,wait 500 ms again!")
                 print(e)
                 time.sleep(0.5)
+        return None
     
     def __download_m3u8_file(self,m3u8Url,outputPath):
         m3u8UrlSplit = m3u8Url.split('/')
@@ -62,7 +124,7 @@ class M3U8Downloader:
             os.mkdir(outputPath)
 
         ret = self.__try_get_url(m3u8Url)
-        if(ret.status_code != 200):
+        if ret == None or ret.status_code != 200 :
             print("%s下载失败" % (m3u8FileName))
             return None
 
@@ -103,4 +165,4 @@ if __name__ == '__main__':
     a = M3U8Downloader()
     #a.down("https://dv-h.phncdn.com/hls/videos/202212/21/421792331/,1080P_4000K,720P_4000K,480P_2000K,240P_1000K,_421792331.mp4.urlset/index-f1-v1-a1.m3u8?ttl=1698768235&l=0&ipa=149.104.96.17&hash=c816c1801755de8bb3ca89d84184560e","./123")
     #a.down("https://ev-h.phncdn.com/hls/videos/202303/07/426913121/,1080P_4000K,720P_4000K,480P_2000K,240P_1000K,_426913121.mp4.urlset/index-f1-v1-a1.m3u8?validfrom=1698766967&validto=1698774167&ipa=149.104.96.17&hdl=-1&hash=XLoMap%2BiGb6zVAvGTuQkILUMAZU%3D","./123")
-    a.down("https://qq.iqiyi2.b555b.com:7777/7f/7f49dcd0c6b118a6e026742774e04bb28100d3ed/hd.m3u8","./pacopacomama_110222_730")
+    a.down("https://qq.iqiyi2.b555b.com:7777/7f/7f49dcd0c6b118a6e026742774e04bb28100d3ed/hd.m3u8","./testss")
