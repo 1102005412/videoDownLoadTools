@@ -5,6 +5,7 @@ import time
 import os
 import threading
 import subprocess
+import msvcrt
 #import ffmpeg    #这个库还是需要依赖ffmpeg，不如直接调ffmpeg命令行
 
 class M3U8Downloader:
@@ -46,8 +47,9 @@ class M3U8Downloader:
             ret = self.__try_get_url(task[0])
             if( ret == None or ret.status_code != 200):
                 self._downTaskLock.acquire()
-                print("%s下载失败%d，跳过 (%d/%d)" % (task[1],ret.status_code,self._finished,self._allNum))
+                print("%s下载失败，跳过 (%d/%d)" % (task[1],self._finished,self._allNum))
                 self._downTaskLock.release()
+                continue
 
             with open(self._outputPath + "/" + task[1], "ab") as code:
                 code.write(ret.content)
@@ -96,7 +98,7 @@ class M3U8Downloader:
                     break
 
                 print("第%d次尝试..." % (count))
-                res = requests.get(url,timeout=self._timeout)
+                res = requests.get(url,timeout=(self._timeout,self._timeout))
                 if res == None or res.status_code != 200:
                     continue
                 
@@ -209,4 +211,5 @@ if __name__ == '__main__':
     start = time.time()
     a.down("https://qq.iqiyi2.b555b.com:7777/7f/7f49dcd0c6b118a6e026742774e04bb28100d3ed/hd.m3u8","./test")
     end = time.time()
-    print("一共耗时：%.2f秒" % (end - start))
+    print("一共耗时：%.2f秒,按任意键退出" % (end - start))
+    msvcrt.getch()
