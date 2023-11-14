@@ -169,10 +169,13 @@ class M3U8Downloader:
         m3u8UrlSplit = m3u8Url.split('/')
         m3u8FileName = m3u8UrlSplit.pop().split('?')[0]
         
-        outputFile = m3u8FileName
-        if "." in m3u8FileName:
-            last_point = m3u8FileName.rfind('.')
-            outputFile = m3u8FileName[:last_point]
+        outputFile = self._outputPath.replace("\\","/")
+        if outputFile[len(outputFile) - 1] == '/':
+            outputFile = outputFile[:len(outputFile) - 1]
+        
+        if "/" in outputFile:
+            last_point = outputFile.rfind("/") + 1
+            outputFile = outputFile[last_point:]
 
         inputPath = self._outputPath + "/" + m3u8FileName
         outputPatn = self._outputPath + "/" + outputFile + ".mp4"
