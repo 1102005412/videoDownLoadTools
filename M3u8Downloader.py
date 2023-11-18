@@ -8,7 +8,7 @@ import subprocess
 import msvcrt
 #import ffmpeg    #这个库还是需要依赖ffmpeg，不如直接调ffmpeg命令行
 
-class M3U8Downloader:
+class M3u8Downloader:
 
     def __init__(self):
         self._downTaskLock = threading.Lock()
@@ -207,12 +207,10 @@ class M3U8Downloader:
         # combine_url_and_download(ts_list,urlpath,outputPath)
 
 
-if __name__ == '__main__':
-    a = M3U8Downloader()
-    #a.down("https://dv-h.phncdn.com/hls/videos/202212/21/421792331/,1080P_4000K,720P_4000K,480P_2000K,240P_1000K,_421792331.mp4.urlset/index-f1-v1-a1.m3u8?ttl=1698768235&l=0&ipa=149.104.96.17&hash=c816c1801755de8bb3ca89d84184560e","./123")
-    #a.down("https://ev-h.phncdn.com/hls/videos/202303/07/426913121/,1080P_4000K,720P_4000K,480P_2000K,240P_1000K,_426913121.mp4.urlset/index-f1-v1-a1.m3u8?validfrom=1698766967&validto=1698774167&ipa=149.104.96.17&hdl=-1&hash=XLoMap%2BiGb6zVAvGTuQkILUMAZU%3D","./123")
+def startTask(m3u8Url,downloadPath):
+    a = M3u8Downloader()
     start = time.time()
-    a.down("https://qq.iqiyi2.b555b.com:7777/7f/7f49dcd0c6b118a6e026742774e04bb28100d3ed/hd.m3u8","./test")
+    a.down(m3u8Url,downloadPath)
     end = time.time()
-    print("一共耗时：%.2f秒,按任意键退出" % (end - start))
-    msvcrt.getch()
+    print("一共耗时：%.2f秒" % (end - start))
+    #msvcrt.getch()

@@ -1,0 +1,102 @@
+from tkinter import *
+import tkinter.filedialog as filedialog
+from tkinter import messagebox
+from M3u8Downloader import startTask
+
+def set_window_center_display(window):
+    screen_width = window.winfo_screenwidth()
+    screen_height = window.winfo_screenheight()
+
+    #获取窗口大小前需要更新一下才能得到实际值
+    window.update()
+    window_width = window.winfo_width()
+    window_height = window.winfo_height()
+
+    # 计算窗口左上角的坐标
+    x = (screen_width - window_width) // 2
+    y = (screen_height - window_height) // 2
+
+    # 设置窗口左上角的坐标
+    window.geometry('{}x{}+{}+{}'.format(window_width,window_height,x, y))
+    window.mainloop()
+
+class NewTaskWindow:
+    def __init__(self):
+        self.__init_window(1080,720)
+        
+    def __select_path(self):
+        path = filedialog.askdirectory(initialdir=".",mustexist=False)
+        if len(path) != 0: 
+            self.__downloadPath.set(path)
+
+    def __start_download(self):
+        url = self.__uriText.get("1.0",END)
+        path = self.__downloadPath.get()
+        #Text 获取的文本末尾自带'\n'
+        if len(url) <= 1 or len(path) == 0:
+            messagebox.showerror("错误","请输入正确的url和下载路径")
+        else:
+            self._window.protocol("WM_DELETE_WINDOW", self._window.quit)
+            self._window.destroy()
+            self.downloadPath = path
+            self.m3u8Url = url
+            if url[len(url) - 1] == '\n':
+                self.m3u8Url = url[:len(url)-1]
+
+    def __init_window(self,width,height):
+        newTaskWindow = Tk()
+        self._window = newTaskWindow
+        self.__downloadPath = StringVar()
+
+        newTaskWindow.title("new task")
+        newTaskWindow.geometry('%dx%d' % (width,height))
+        #newTaskWindow.resizable(0, 0)
+
+        urlLable = Label(newTaskWindow,text="m3u8 url:")
+        uriText = Text(newTaskWindow,width=1,height=1)
+        downloadPathLable = Label(newTaskWindow,text="下载路径:")
+        downloadPathEntry = Entry(newTaskWindow,textvariable = self.__downloadPath)
+        self.__uriText = uriText
+
+        selectPathBtn = Button(newTaskWindow,text = "选择文件夹",
+        fg = "black",height = 1,
+        font = ('楷体',10,'bold'),
+        command = self.__select_path)
+
+        startTaskBtn = Button(newTaskWindow,text = "开始下载",
+        fg = "red",height = 1,
+        font = ('楷体',10,'bold'),
+        command = self.__start_download)
+
+        row = 1
+        urlLable.grid(row=row,column=0,pady=5,sticky=E+N)
+        uriText.grid(row=row,column=1,pady=5,sticky=W+E+S+N)
+
+        row = row + 1
+        downloadPathLable.grid(row=row,column=0,sticky=E+N)
+        downloadPathEntry.grid(row=row,column=1,sticky=W+E+N)
+        selectPathBtn.grid(row=row,column=2,sticky=W+N)
+
+        row = row + 1
+        startTaskBtn.grid(row=row,column=1,sticky=N,pady=5,ipadx=10,ipady=10)
+
+        newTaskWindow.grid_columnconfigure(0,weight=1)
+        newTaskWindow.grid_columnconfigure(1,weight=5)
+        newTaskWindow.grid_columnconfigure(2,weight=1)
+        newTaskWindow.grid_rowconfigure(0,weight=2)
+        newTaskWindow.grid_rowconfigure(1,weight=3)
+        newTaskWindow.grid_rowconfigure(2)
+        newTaskWindow.grid_rowconfigure(3,weight=3)
+
+        set_window_center_display(newTaskWindow)
+
+    def dispaly(self):
+        self._window.mainloop()
+
+
+if __name__ == '__main__':
+    task = NewTaskWindow()
+    task.dispaly()
+    print("m3u8Url:" + task.m3u8Url)
+    print("downloadPath:"+task.downloadPath)
+    startTask(task.m3u8Url,task.downloadPath)
