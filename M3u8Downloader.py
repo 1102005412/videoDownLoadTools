@@ -6,6 +6,7 @@ import os
 import threading
 import subprocess
 import msvcrt
+import shutil
 #import ffmpeg    #这个库还是需要依赖ffmpeg，不如直接调ffmpeg命令行
 
 class M3u8Downloader:
@@ -23,7 +24,7 @@ class M3u8Downloader:
         for i in range(self._currentIndex,self._allNum):
             ts = self._tsList[i]
             fileName = ts.split('?')[0]
-            if(os.path.exists(self._outputPath + "/" + fileName)):
+            if(os.path.exists(self._taskPath + "/" + fileName)):
                 self._finished = self._finished + 1
                 print("%s已存在，跳过 (%d / %d)" % (fileName,self._finished,self._allNum))
                 continue
@@ -51,20 +52,21 @@ class M3u8Downloader:
                 self._downTaskLock.release()
                 continue
 
-            with open(self._outputPath + "/" + task[1], "ab") as code:
+            with open(self._taskPath + "/" + task[1], "wb") as code:
                 code.write(ret.content)
+                code.close()
                 self._downTaskLock.acquire()
                 self._finished = self._finished + 1
                 print("%s下载成功 (%d/%d)" % (task[1],self._finished,self._allNum))
                 self._downTaskLock.release()
 
 
-    def __download_ts_list(self,tsList,outputPath):
+    def __download_ts_list(self,tsList):
         self._allNum = len(tsList)
         self._currentIndex = 0
         self._tsList = tsList
         self._finished = 0
-        self._outputPath = outputPath
+        outputPath = self._taskPath
         print("allNum = %d" % (self._allNum))
 
         threadList = []
@@ -118,14 +120,15 @@ class M3u8Downloader:
                 time.sleep(0.5)
         return None
     
-    def __download_m3u8_file(self,m3u8Url,outputPath):
+    def __download_m3u8_file(self,m3u8Url,outputPath,taskName):
         m3u8UrlSplit = m3u8Url.split('/')
         m3u8FileName = m3u8UrlSplit.pop().split('?')[0]
 
-        if os.path.exists(outputPath):
+        taskPath = outputPath + "/" + taskName
+        if os.path.exists(taskPath):
             pass
         else:
-            os.mkdir(outputPath)
+            os.mkdir(taskPath)
 
         ret = self.__try_get_url(m3u8Url)
         if ret == None or ret.status_code != 200 :
@@ -133,7 +136,7 @@ class M3u8Downloader:
             return None
 
         lines = ret.text.split('\n')
-        u3m8file = open(outputPath + "/" + m3u8FileName, "wt")
+        u3m8file = open(taskPath + "/" + m3u8FileName, "wt")
         if u3m8file == None:
             print("%s 创建失败" % (m3u8FileName))
             return None
@@ -143,6 +146,10 @@ class M3u8Downloader:
             else:
                 u3m8file.write(line + "\n")
         u3m8file.close()
+
+        with open(taskPath + "/" + taskName + ".task", "wt") as urlFile:
+            urlFile.write(m3u8Url)
+            urlFile.close()
         
         print("%s下载成功" % (m3u8FileName))
 
@@ -150,15 +157,15 @@ class M3u8Downloader:
         for i in m3u8UrlSplit:
             self.__downUrl += i + "/"
 
+        self._taskPath = taskPath
         return ret.text
 
     def __clear_ts_list(self):
-        for ts in self._tsList:
-            fileName = self._outputPath + "/" + ts.split('?')[0]
-            if(os.path.exists(fileName)):
-                os.remove(fileName)
-            else:
-                print("%s 不存在" % (fileName))
+        fileName = self._taskPath
+        if(os.path.exists(fileName)):
+            shutil.rmtree(fileName)
+        else:
+            print("%s 不存在" % (fileName))
 
     def __combine_ts_list(self,m3u8Url):
         print("开始合并ts片段...")
@@ -168,17 +175,9 @@ class M3u8Downloader:
 
         m3u8UrlSplit = m3u8Url.split('/')
         m3u8FileName = m3u8UrlSplit.pop().split('?')[0]
-        
-        outputFile = self._outputPath.replace("\\","/")
-        if outputFile[len(outputFile) - 1] == '/':
-            outputFile = outputFile[:len(outputFile) - 1]
-        
-        if "/" in outputFile:
-            last_point = outputFile.rfind("/") + 1
-            outputFile = outputFile[last_point:]
 
-        inputPath = self._outputPath + "/" + m3u8FileName
-        outputPatn = self._outputPath + "/" + outputFile + ".mp4"
+        inputPath = self._taskPath + "/" + m3u8FileName
+        outputPatn = self._taskPath + ".mp4"
 
         #stream = ffmpeg.input(self._outputPath + "/" + m3u8FileName)
         #stream = ffmpeg.output(stream,self._outputPath + "/" + outputFile + ".mp4",c="copy")
@@ -194,23 +193,28 @@ class M3u8Downloader:
         print("清理完成!")
 
 
-    def down(self,m3u8Url,outputPath):
-        m3u8Data = self.__download_m3u8_file(m3u8Url,outputPath)
+    def down(self,m3u8Url,outputPath,taskName):
+        m3u8Data = self.__download_m3u8_file(m3u8Url,outputPath,taskName)
         if(None == m3u8Data):
             return
         
         tsList = self.__get_ts_list(m3u8Data)
-        self.__download_ts_list(tsList,outputPath)
+        self.__download_ts_list(tsList)
         self.__combine_ts_list(m3u8Url)
         # if(!self)
         # ts_list = get_ts_list(m3_path)
         # combine_url_and_download(ts_list,urlpath,outputPath)
 
 
-def startTask(m3u8Url,downloadPath):
+def startTask(m3u8Url,downloadPath,taskName):
     a = M3u8Downloader()
     start = time.time()
-    a.down(m3u8Url,downloadPath)
+
+    downloadPath = downloadPath.replace("\\","/")
+    if downloadPath[len(downloadPath) - 1] == '/':
+        downloadPath = downloadPath[:-1]
+
+    a.down(m3u8Url,downloadPath,taskName)
     end = time.time()
     print("一共耗时：%.2f秒" % (end - start))
     #msvcrt.getch()
