@@ -11,11 +11,11 @@ import shutil
 
 class M3u8Downloader:
 
-    def __init__(self):
+    def __init__(self,threadCount = 10,timeout = 30,retry = 5):
         self._downTaskLock = threading.Lock()
-        self._timeout = 30      #超时时间 单位：秒
-        self._retry = 5         #重试次数
-        self._threadCount = 12  #线程数
+        self._timeout = timeout      #超时时间 单位：秒
+        self._retry = retry         #重试次数
+        self._threadCount = threadCount  #线程数
 
     def __get_next_task(self):
         task = []
@@ -130,6 +130,8 @@ class M3u8Downloader:
         else:
             os.mkdir(taskPath)
 
+        M3u8Downloader.saveTask(m3u8Url,outputPath,taskName)
+
         ret = self.__try_get_url(m3u8Url)
         if ret == None or ret.status_code != 200 :
             print("%s下载失败" % (m3u8FileName))
@@ -146,11 +148,6 @@ class M3u8Downloader:
             else:
                 u3m8file.write(line + "\n")
         u3m8file.close()
-
-        with open(taskPath + "/" + taskName + ".task", "wt") as urlFile:
-            urlFile.write(m3u8Url)
-            urlFile.close()
-        
         print("%s下载成功" % (m3u8FileName))
 
         self.__downUrl = ""
@@ -204,10 +201,28 @@ class M3u8Downloader:
         # if(!self)
         # ts_list = get_ts_list(m3_path)
         # combine_url_and_download(ts_list,urlpath,outputPath)
+    
+    @staticmethod
+    def saveTask(m3u8Url,outputPath,taskName):
+        #保存任务信息，如果失败可以重新下载
+        taskfile = outputPath + "/" + taskName + "/" + taskName + ".m3u8task"
+        with open(taskfile, "wt") as urlFile:
+            urlFile.write(m3u8Url + '\n')
+            urlFile.write(outputPath + '\n')
+            urlFile.write(taskName + '\n')
+            urlFile.close()
+    @staticmethod
+    def loadTask(taskfile):
+        with open(taskfile, "rt") as urlFile:
+            m3u8Url = urlFile.readline()
+            outputPath = urlFile.readline()
+            taskName = urlFile.readline()
+            urlFile.close()
+            return [m3u8Url[:-1],outputPath[:-1],taskName[:-1]]
+        return None
 
-
-def startTask(m3u8Url,downloadPath,taskName):
-    a = M3u8Downloader()
+def startTask(m3u8Url,downloadPath,taskName,threadCount=10,timeout=30,retry=5):
+    a = M3u8Downloader(threadCount,timeout,retry)
     start = time.time()
 
     downloadPath = downloadPath.replace("\\","/")
