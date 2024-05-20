@@ -102,6 +102,7 @@ class M3u8Downloader:
                 print("第%d次尝试..." % (count))
                 res = requests.get(url,timeout=(self._timeout,self._timeout))
                 if res == None or res.status_code != 200:
+                    time.sleep(0.5)
                     continue
                 
                 lengthStr = res.headers.get('Content-Length')
@@ -109,9 +110,10 @@ class M3u8Downloader:
                     length = int(lengthStr)
                     if length != len(res.content):
                         print("check data error,retry!")
+                        time.sleep(0.5)
                         continue
                 else:
-                    print("%s:%d why come here?" % (__file__,__line__))
+                    print("can't find Content-Length.res.headers=",res.headers)
                 
                 return res
             except Exception as e:
@@ -176,6 +178,13 @@ class M3u8Downloader:
         inputPath = self._taskPath + "/" + m3u8FileName
         outputPatn = self._taskPath + ".mp4"
 
+        i = 1
+        while(os.path.exists(outputPatn)):
+            print("%s 已存在!" % (outputPatn))
+            outputPatn = self._taskPath + "(%d).mp4" % (i)
+            print("重新生成命名为:%s" % (outputPatn))
+            i = i + 1
+
         #stream = ffmpeg.input(self._outputPath + "/" + m3u8FileName)
         #stream = ffmpeg.output(stream,self._outputPath + "/" + outputFile + ".mp4",c="copy")
         #ffmpeg.run(stream)
@@ -184,7 +193,11 @@ class M3u8Downloader:
             '-c','copy',outputPatn]
         subprocess.run(command)
 
-        print("合并完成，开始清理ts片段...")
+        if(os.path.exists(outputPatn) == False):
+            print("合并失败，请确认...")
+            return
+        print("合并完成，输出文件为:%s" % (outputPatn))
+        print("开始清理ts片段...")
         os.remove(inputPath)
         self.__clear_ts_list()
         print("清理完成!")
