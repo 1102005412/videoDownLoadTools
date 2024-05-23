@@ -90,7 +90,10 @@ class NewTaskWindow:
         config.write(file_write)
 
     def __select_path(self):
-        path = filedialog.askdirectory(initialdir=".",mustexist=False)
+        path = self.__downloadPath.get()
+        if len(path) == 0:
+            path = "."
+        path = filedialog.askdirectory(initialdir=path,mustexist=False)
         if len(path) != 0: 
             self.__downloadPath.set(path)
 
