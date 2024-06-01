@@ -138,6 +138,18 @@ class NewTaskWindow:
         now_time = datetime.datetime.now()
         self.__taskName.set(now_time.strftime('%Y%m%d_%H%M%S_%f')[:-3])
 
+    def __do_paste(self,event):
+        widget = event.widget
+        clipboard_content = self._window.clipboard_get()
+
+        index = INSERT
+        if (type(widget) is Entry and widget.selection_present()) or \
+        (type(widget) is Text  and len(widget.tag_ranges("sel")) != 0 ):
+            index = widget.index(SEL_FIRST)
+            widget.delete(SEL_FIRST,SEL_LAST)
+        
+        widget.insert(index,clipboard_content)
+
     def __init_window(self,width,height):
         newTaskWindow = Tk()
         self._window = newTaskWindow
@@ -153,6 +165,8 @@ class NewTaskWindow:
 
         urlLable = Label(newTaskWindow,text="m3u8 url:")
         uriText = Text(newTaskWindow,width=1,height=1)
+        uriText.bind('<ButtonRelease-3>',self.__do_paste)
+
         downloadPathLable = Label(newTaskWindow,text="下载路径:")
         downloadPathEntry = Entry(newTaskWindow,textvariable = self.__downloadPath)
         self.__uriText = uriText
@@ -184,6 +198,7 @@ class NewTaskWindow:
 
         taskNameLable = Label(newTaskWindow,text="任务名称:")
         taskNameEntry = Entry(newTaskWindow,textvariable = self.__taskName)
+        taskNameEntry.bind('<ButtonRelease-3>',self.__do_paste)
 
         row = 1
         urlLable.grid(row=row,column=0,pady=5,sticky=E+N)
