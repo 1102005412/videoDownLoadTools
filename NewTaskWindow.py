@@ -114,6 +114,17 @@ class NewTaskWindow:
             self.timeout = int(self.__timeout.get())
             self.retry = int(self.__retry.get())
 
+    def __load_task(self):
+        path = filedialog.askopenfilename(initialdir=self.downloadPath,filetypes=[('Text Files','.m3u8task')])
+        if path == None or len(path) == 0:
+            return
+        task = M3u8Downloader.loadTask(path)
+        if task == None:
+            return
+        self.__uriText.insert("1.0",task[0])
+        self.__downloadPath.set(task[1])
+        self.__taskName.set(task[2])
+
     def __continue_task(self):
         path = filedialog.askopenfilename(initialdir=self.downloadPath,filetypes=[('Text Files','.m3u8task')])
         if path == None or len(path) == 0:
@@ -187,6 +198,12 @@ class NewTaskWindow:
         command = self.__get_timestamp)
         ToolTip(useTimestamp,"以当前系统时间命名")
 
+        loadTaskBtn = Button(buttonframe,text = "导入任务",
+        fg = "red",height = 1,
+        font = ('楷体',10,'bold'),
+        command = self.__load_task)
+        ToolTip(loadTaskBtn,"导入之前未下载完的任务")
+
         continueTaskBtn = Button(buttonframe,text = "继续下载",
         fg = "red",height = 1,
         font = ('楷体',10,'bold'),
@@ -254,8 +271,9 @@ class NewTaskWindow:
 
         row = row + 1
         buttonframe.grid(row=row,column=1,sticky=N+S+W+E)
-        continueTaskBtn.grid(row=1,column=1,sticky=N+S+E+W)
-        startTaskBtn.grid(row=1,column=3,sticky=N+S+W+E)
+        loadTaskBtn.grid(row=1,column=1,sticky=N+S+E+W,padx=5)
+        continueTaskBtn.grid(row=1,column=2,sticky=N+S+E+W,padx=5)
+        startTaskBtn.grid(row=1,column=3,sticky=N+S+W+E,padx=5)
         buttonframe.grid_rowconfigure(0,weight=2)
         buttonframe.grid_rowconfigure(1,weight=1)
         buttonframe.grid_rowconfigure(2,weight=3)
