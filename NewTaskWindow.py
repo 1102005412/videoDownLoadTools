@@ -24,7 +24,6 @@ def set_window_center_display(window):
 
     # 设置窗口左上角的坐标
     window.geometry('{}x{}+{}+{}'.format(window_width,window_height,x, y))
-    window.mainloop()
 
 def is_valid_filename(filename):
     """
@@ -42,7 +41,6 @@ def try_read_config(config,selection,name):
 
 class NewTaskWindow:
     def __init__(self):
-        self.hasTask = False
         self.__configFileName = "taskConfig.ini"
         self.downloadPath = ""
         self.threadCount = 10
@@ -50,7 +48,6 @@ class NewTaskWindow:
         self.retry = 5
 
         self.__read_config()
-        self.__init_window(1080,720)
 
     def __read_config(self):
         configFileName = self.__configFileName
@@ -73,11 +70,7 @@ class NewTaskWindow:
         if temp:
             self.retry = temp
 
-    def __save_config(self):
-        self.threadCount = int(self.__threadCount.get())
-        self.timeout = int(self.__timeout.get())
-        self.retry = int(self.__retry.get())
-        
+    def save_config(self):
         configFileName = self.__configFileName
         config = configparser.ConfigParser()
         config["MainWindow"] = {
@@ -117,7 +110,9 @@ class NewTaskWindow:
             if url[len(url) - 1] == '\n':
                 self.m3u8Url = url[:-1]
             self.hasTask = True
-            self.__save_config()
+            self.threadCount = int(self.__threadCount.get())
+            self.timeout = int(self.__timeout.get())
+            self.retry = int(self.__retry.get())
 
     def __continue_task(self):
         path = filedialog.askopenfilename(initialdir=self.downloadPath,filetypes=[('Text Files','.m3u8task')])
@@ -126,7 +121,6 @@ class NewTaskWindow:
         task = M3u8Downloader.loadTask(path)
         if task == None:
             return
-        self.__save_config()
         self.m3u8Url = task[0]
         self.downloadPath = task[1]
         self.taskName = task[2]
@@ -282,15 +276,41 @@ class NewTaskWindow:
         set_window_center_display(newTaskWindow)
 
     def dispaly(self):
+        self.hasTask = False
+        self.__init_window(1080,720)
         self._window.mainloop()
+
+def isContinue(ret):
+    t = Tk()
+    t.geometry('%dx%d' % (0,0))
+    set_window_center_display(t)
+
+    title = 'Download Succeed!' if ret else 'Download Fail!'
+    answer = messagebox.askquestion(title, 'Do you want to download continue?',parent=t)
+    t.protocol("WM_DELETE_WINDOW", t.quit)
+    t.destroy()
+
+    if answer == 'yes':
+        print("User selected yes.")
+        return True
+    else:
+        print("User selected no.")
+        return False
 
 
 if __name__ == '__main__':
+    iscontinue = True
     task = NewTaskWindow()
-    task.dispaly()
-    
-    if task.hasTask:
-        print("m3u8Url:" + task.m3u8Url)
-        print("downloadPath:"+task.downloadPath)
-        print("taskName:"+task.taskName)
-        startTask(task.m3u8Url,task.downloadPath,task.taskName,task.threadCount,task.timeout,task.retry)
+    while(iscontinue):
+        iscontinue = False
+        task.dispaly()
+
+        ret = False
+        if task.hasTask:
+            print("m3u8Url:" + task.m3u8Url)
+            print("downloadPath:"+task.downloadPath)
+            print("taskName:"+task.taskName)
+            ret = startTask(task.m3u8Url,task.downloadPath,task.taskName,task.threadCount,task.timeout,task.retry)
+            iscontinue = isContinue(ret)
+    task.save_config()
+            

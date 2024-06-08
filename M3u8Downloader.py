@@ -170,7 +170,7 @@ class M3u8Downloader:
         print("开始合并ts片段...")
         if self._finished != self._allNum:
             print("文件数量不全，取消合并，请尝试重新下载!")
-            return
+            return False
 
         m3u8UrlSplit = m3u8Url.split('/')
         m3u8FileName = m3u8UrlSplit.pop().split('?')[0]
@@ -195,22 +195,23 @@ class M3u8Downloader:
 
         if(os.path.exists(outputPatn) == False):
             print("合并失败，请确认...")
-            return
+            return False
         print("合并完成，输出文件为:%s" % (outputPatn))
         print("开始清理ts片段...")
         os.remove(inputPath)
         self.__clear_ts_list()
         print("清理完成!")
+        return True
 
 
     def down(self,m3u8Url,outputPath,taskName):
         m3u8Data = self.__download_m3u8_file(m3u8Url,outputPath,taskName)
         if(None == m3u8Data):
-            return
+            return False
         
         tsList = self.__get_ts_list(m3u8Data)
         self.__download_ts_list(tsList)
-        self.__combine_ts_list(m3u8Url)
+        return self.__combine_ts_list(m3u8Url)
         # if(!self)
         # ts_list = get_ts_list(m3_path)
         # combine_url_and_download(ts_list,urlpath,outputPath)
@@ -242,7 +243,8 @@ def startTask(m3u8Url,downloadPath,taskName,threadCount=10,timeout=30,retry=5):
     if downloadPath[len(downloadPath) - 1] == '/':
         downloadPath = downloadPath[:-1]
 
-    a.down(m3u8Url,downloadPath,taskName)
+    ret = a.down(m3u8Url,downloadPath,taskName)
     end = time.time()
     print("一共耗时：%.2f秒" % (end - start))
     #msvcrt.getch()
+    return ret
