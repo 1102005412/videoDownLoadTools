@@ -125,6 +125,9 @@ class NewTaskWindow:
         self.downloadPath = task[1]
         self.taskName = task[2]
         self.hasTask = True
+        self.threadCount = int(self.__threadCount.get())
+        self.timeout = int(self.__timeout.get())
+        self.retry = int(self.__retry.get())
         self._window.protocol("WM_DELETE_WINDOW", self._window.quit)
         self._window.destroy()
 
