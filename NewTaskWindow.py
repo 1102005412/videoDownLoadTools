@@ -1,29 +1,14 @@
 from tkinter import *
 import tkinter.filedialog as filedialog
 from tkinter import messagebox
-from M3u8Downloader import startTask
 import datetime
 import configparser
 import os
 import re
 from ToolTip import *
 from M3u8Downloader import M3u8Downloader
-
-def set_window_center_display(window):
-    screen_width = window.winfo_screenwidth()
-    screen_height = window.winfo_screenheight()
-
-    #获取窗口大小前需要更新一下才能得到实际值
-    window.update()
-    window_width = window.winfo_width()
-    window_height = window.winfo_height()
-
-    # 计算窗口左上角的坐标
-    x = (screen_width - window_width) // 2
-    y = (screen_height - window_height) // 2
-
-    # 设置窗口左上角的坐标
-    window.geometry('{}x{}+{}+{}'.format(window_width,window_height,x, y))
+import DownTask
+import base
 
 def is_valid_filename(filename):
     """
@@ -294,17 +279,20 @@ class NewTaskWindow:
         newTaskWindow.grid_rowconfigure(1,weight=3)
         newTaskWindow.grid_rowconfigure(row,weight=3)
 
-        set_window_center_display(newTaskWindow)
+        base.set_window_center_display(newTaskWindow)
 
     def dispaly(self):
         self.hasTask = False
         self.__init_window(1080,720)
         self._window.mainloop()
+    
+    def get_downtask(self):
+        return DownTask.DownTask(self.m3u8Url,self.downloadPath,self.taskName,self.threadCount,self.timeout,self.retry)
 
 def isContinue(ret):
     t = Tk()
     t.geometry('%dx%d' % (0,0))
-    set_window_center_display(t)
+    base.set_window_center_display(t)
 
     title = 'Download Succeed!' if ret else 'Download Fail!'
     answer = messagebox.askquestion(title, 'Do you want to download continue?',parent=t)
@@ -321,17 +309,18 @@ def isContinue(ret):
 
 if __name__ == '__main__':
     iscontinue = True
-    task = NewTaskWindow()
+    window = NewTaskWindow()
+    downthread = DownTask.DownTaskThread()
     while(iscontinue):
         iscontinue = False
-        task.dispaly()
+        window.dispaly()
 
-        ret = False
-        if task.hasTask:
-            print("m3u8Url:" + task.m3u8Url)
-            print("downloadPath:"+task.downloadPath)
-            print("taskName:"+task.taskName)
-            ret = startTask(task.m3u8Url,task.downloadPath,task.taskName,task.threadCount,task.timeout,task.retry)
-            iscontinue = isContinue(ret)
-    task.save_config()
-            
+        if window.hasTask:
+            downthread.add_task(window.get_downtask())
+            downthread.start_download()
+            iscontinue = True
+
+    downthread.stop_download()
+    downthread.save_task_list()
+    window.save_config()
+    

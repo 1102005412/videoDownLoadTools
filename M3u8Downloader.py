@@ -205,10 +205,16 @@ class M3u8Downloader:
 
 
     def down(self,m3u8Url,outputPath,taskName):
-        m3u8Data = self.__download_m3u8_file(m3u8Url,outputPath,taskName)
-        if(None == m3u8Data):
+        try:
+            m3u8Data = self.__download_m3u8_file(m3u8Url,outputPath,taskName)
+            if(None == m3u8Data):
+                return False
+        except Exception as e:
+            print("we catch an exception,wait 500 ms again!")
+            print(e)
+            time.sleep(0.5)
             return False
-        
+            
         tsList = self.__get_ts_list(m3u8Data)
         self.__download_ts_list(tsList)
         return self.__combine_ts_list(m3u8Url)
