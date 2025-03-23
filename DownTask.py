@@ -106,7 +106,8 @@ class DownTaskThread:
         base.set_window_center_display(t)
 
         title = 'Download Succeed!' if ret else 'Download Fail!'
-        answer = messagebox.askquestion(title, 'Do you want to download continue?',parent=t)
+        answer = messagebox.askquestion(title, 'Do you want to download continue?',\
+                                        parent = t,timeout = 30 * 1000,default="ok")
         t.protocol("WM_DELETE_WINDOW", t.quit)
         t.destroy()
 
@@ -119,7 +120,7 @@ class DownTaskThread:
 
     def save_task_list(self):
         if len(self.taskList) > 0 :
-            with open("downloadTaskList.txt", "wt") as taskF:
+            with open("downloadTaskList.txt", "wt",encoding='utf-8') as taskF:
                 for task in self.taskList:
                     taskF.write(task.m3u8Url + "\n")
                     taskF.write(task.downloadPath + "\n")

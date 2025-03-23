@@ -16,6 +16,12 @@ class M3u8Downloader:
         self._timeout = timeout      #超时时间 单位：秒
         self._retry = retry         #重试次数
         self._threadCount = threadCount  #线程数
+        # self._headers={
+        #     'User-Agent': 'python',
+        #     'Accept': 'application/json',
+        #     'Accept-Encoding': 'gzip, deflate'
+        # }
+        self._m3u8EnableTypes = [".ts",".jpg",".jpeg"]
 
     def __get_next_task(self):
         task = []
@@ -24,12 +30,18 @@ class M3u8Downloader:
         for i in range(self._currentIndex,self._allNum):
             ts = self._tsList[i]
             fileName = ts.split('?')[0]
+            if fileName.endswith(".ts") is False:
+                fileName += ".ts"
+
             if(os.path.exists(self._taskPath + "/" + fileName)):
                 self._finished = self._finished + 1
                 print("%s已存在，跳过 (%d / %d)" % (fileName,self._finished,self._allNum))
                 continue
             
-            task = [self.__downUrl + ts, fileName]
+            if ts.startswith("http://") or ts.startswith("https://"):
+                task = [ts, fileName.split("/")[-1]]
+            else:
+                task = [self.__downUrl + ts, fileName]
             hasFind = True
             self._currentIndex = i + 1
             break
@@ -49,6 +61,7 @@ class M3u8Downloader:
             if( ret == None or ret.status_code != 200):
                 self._downTaskLock.acquire()
                 print("%s下载失败，跳过 (%d/%d)" % (task[1],self._finished,self._allNum))
+                print("Url=%s" % task[0])
                 self._downTaskLock.release()
                 continue
 
@@ -87,7 +100,7 @@ class M3u8Downloader:
         lines = m3u8Data.split('\n')
         ts = []
         for i in lines:
-            if ".ts" in i:
+            if any(var in i for var in self._m3u8EnableTypes):
                 ts.append(i)
         return ts
 
@@ -145,10 +158,16 @@ class M3u8Downloader:
             print("%s 创建失败" % (m3u8FileName))
             return None
         for line in lines:
-            if ".ts" in line:
-                u3m8file.write(line.split('?')[0] + "\n")
+            if any(var in line for var in self._m3u8EnableTypes):
+                fileName = line.split('?')[0]
+                if line.startswith("http:") or line.startswith("https:"):
+                    fileName = fileName.split("/")[-1]
+                if fileName.endswith(".ts") is False:
+                    fileName += ".ts"
+                u3m8file.write(fileName + "\n")
             else:
                 u3m8file.write(line + "\n")
+
         u3m8file.close()
         print("%s下载成功" % (m3u8FileName))
 
