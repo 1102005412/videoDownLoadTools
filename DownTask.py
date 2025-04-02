@@ -104,19 +104,21 @@ class DownTaskThread:
         t = Tk()
         t.geometry('%dx%d' % (0,0))
         base.set_window_center_display(t)
-
+        t.after(1000 * 30, t.destroy)  # 超时强制关闭‌:ml-citation{ref="6" data="citationList"}
         title = 'Download Succeed!' if ret else 'Download Fail!'
-        answer = messagebox.askquestion(title, 'Do you want to download continue?',\
-                                        parent = t,timeout = 30 * 1000,default="ok")
-        t.protocol("WM_DELETE_WINDOW", t.quit)
-        t.destroy()
+        answer = messagebox.askquestion(title, 'Do you want to download continue?',parent = t)
+        #t.protocol("WM_DELETE_WINDOW", t.quit)
+        #t.destroy()
 
         if answer == 'yes':
             print("User selected yes.")
             return True
-        else:
+        elif answer == 'no':
             print("User selected no.")
             return False
+        else:
+            print("User selected timeout,default yes!")
+            return True
 
     def save_task_list(self):
         if len(self.taskList) > 0 :

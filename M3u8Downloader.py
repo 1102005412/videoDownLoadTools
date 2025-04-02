@@ -40,6 +40,8 @@ class M3u8Downloader:
             
             if ts.startswith("http://") or ts.startswith("https://"):
                 task = [ts, fileName.split("/")[-1]]
+            elif ts.startswith("/"):
+                task = [self.__downUrl + ts[1:], fileName.split("/")[-1]]
             else:
                 task = [self.__downUrl + ts, fileName]
             hasFind = True
@@ -153,14 +155,14 @@ class M3u8Downloader:
             return None
 
         lines = ret.text.split('\n')
-        u3m8file = open(taskPath + "/" + m3u8FileName, "wt")
+        u3m8file = open(taskPath + "/" + m3u8FileName, "wt",encoding='utf-8')
         if u3m8file == None:
             print("%s 创建失败" % (m3u8FileName))
             return None
         for line in lines:
             if any(var in line for var in self._m3u8EnableTypes):
                 fileName = line.split('?')[0]
-                if line.startswith("http:") or line.startswith("https:"):
+                if line.startswith("http:") or line.startswith("https:") or "/" in line:
                     fileName = fileName.split("/")[-1]
                 if fileName.endswith(".ts") is False:
                     fileName += ".ts"
@@ -245,7 +247,7 @@ class M3u8Downloader:
     def saveTask(m3u8Url,outputPath,taskName):
         #保存任务信息，如果失败可以重新下载
         taskfile = outputPath + "/" + taskName + "/" + taskName + ".m3u8task"
-        with open(taskfile, "wt") as urlFile:
+        with open(taskfile, "wt",encoding='utf-8') as urlFile:
             urlFile.write(m3u8Url + '\n')
             urlFile.write(outputPath + '\n')
             urlFile.write(taskName + '\n')
