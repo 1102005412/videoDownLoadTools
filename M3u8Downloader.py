@@ -254,7 +254,7 @@ class M3u8Downloader:
             urlFile.close()
     @staticmethod
     def loadTask(taskfile):
-        with open(taskfile, "rt") as urlFile:
+        with open(taskfile, "rt",encoding='utf-8') as urlFile:
             m3u8Url = urlFile.readline()
             outputPath = urlFile.readline()
             taskName = urlFile.readline()

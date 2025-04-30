@@ -9,14 +9,58 @@ from ToolTip import *
 from M3u8Downloader import M3u8Downloader
 import DownTask
 import base
+import sys
 
-def is_valid_filename(filename):
+def is_valid_filename(filename: str, allow_dots: bool = False) -> bool:
     """
-    判断文件名是否合法
+    校验文件名合法性
+    :param filename: 待校验的文件名（不含路径）
+    :param allow_dots: 是否允许以点开头或结尾（用于处理隐藏文件）
+    :return: 是否合法
     """
-    pattern = "[\\/:*?\"<>|]"
-    res = re.match(pattern,filename)
-    return res is None
+    # ------------------- 基础校验 -------------------
+    # 空值检查
+    if not filename or filename.strip() == "":
+        print("filename is None!")
+        return False
+    
+    # 长度检查（1-255字符）
+    if len(filename) > 255 or len(filename) < 1:
+        return False
+
+    # ------------------- 非法字符检查 -------------------
+    # 正则表达式：排除 \ / : * ? " < > | 和控制字符
+    illegal_pattern = r'[\\/:*?"<>|\x00-\x1F]'
+    if re.search(illegal_pattern, filename):
+        print("文件名不能包含以下字符：",illegal_pattern)
+        return False
+
+    # ------------------- 特殊格式检查 -------------------
+    # 禁止全空格文件名
+    if filename.strip() == "":
+        print("禁止全空格文件名!")
+        return False
+
+    # 可选：禁止以点开头/结尾（默认关闭）
+    if not allow_dots:
+        if filename.startswith('.') or filename.endswith('.'):
+            print("文件名禁止以点开头/结尾!")
+            return False
+
+    # ------------------- 系统保留名称检查 -------------------
+    # Windows 保留名称列表（不区分大小写）
+    windows_reserved = [
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4",
+        "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", 
+        "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    ]
+    if sys.platform.startswith('win'):
+        if filename.split('.')[0].upper() in windows_reserved:
+            print("禁止使用下列名称做文件名（不区分大小写）：",windows_reserved)
+            return False
+
+    return True
+
 
 def try_read_config(config,selection,name):
     try:
