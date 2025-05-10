@@ -7,7 +7,7 @@ import base
 import pygame
 
 class DownTask:
-    def __init__(self,m3u8Url,downloadPath,taskName,threadCount,timeout,retry):
+    def __init__(self,m3u8Url,downloadPath,taskName,threadCount = 10,timeout = 30,retry = 5):
         self.m3u8Url = m3u8Url
         self.downloadPath = downloadPath
         self.taskName = taskName
@@ -41,8 +41,14 @@ class DownTaskThread:
         self.allFinishSound.set_volume(1)
     
     def add_task(self,task):
+        taskInList = False
         self.taskListLock.acquire()
-        self.taskList.append(task)
+        for t in self.taskList:
+            if task.m3u8Url == t.m3u8Url:
+                taskInList = True
+                break
+        if taskInList == False:
+            self.taskList.append(task)
         num = len(self.taskList)
         self.taskListLock.release()
         
@@ -50,10 +56,15 @@ class DownTaskThread:
         t.geometry('%dx%d' % (0,0))
         base.set_window_center_display(t)
 
-        title = 'add Succeed!'
-        answer = messagebox.showinfo(title, 'current download queue len is %d' % num,parent=t)
+        if taskInList == False:
+            title = 'add Succeed!'
+            answer = messagebox.showinfo(title, 'current download queue len is %d' % num,parent=t)
+        else:
+            title = 'add Fail!'
+            answer = messagebox.showinfo(title, 'The url already exists in the download queue,current download queue len is %d' % num,parent=t)
         t.protocol("WM_DELETE_WINDOW", t.quit)
         t.destroy()
+        return taskInList == False
 
     def start_download(self):
         if self.downThread is None:

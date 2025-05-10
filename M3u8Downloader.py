@@ -7,6 +7,7 @@ import threading
 import subprocess
 import msvcrt
 import shutil
+import DownTask
 #import ffmpeg    #这个库还是需要依赖ffmpeg，不如直接调ffmpeg命令行
 
 class M3u8Downloader:
@@ -259,7 +260,7 @@ class M3u8Downloader:
             outputPath = urlFile.readline()
             taskName = urlFile.readline()
             urlFile.close()
-            return [m3u8Url[:-1],outputPath[:-1],taskName[:-1]]
+            return DownTask.DownTask(m3u8Url[:-1],outputPath[:-1],taskName[:-1])
         return None
 
 def startTask(m3u8Url,downloadPath,taskName,threadCount=10,timeout=30,retry=5):

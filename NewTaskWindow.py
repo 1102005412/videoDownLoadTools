@@ -150,9 +150,13 @@ class NewTaskWindow:
         task = M3u8Downloader.loadTask(path)
         if task == None:
             return
-        self.__uriText.insert("1.0",task[0])
-        self.__downloadPath.set(task[1])
-        self.__taskName.set(task[2])
+        self.__display_task(task)
+    
+    def __display_task(self,task):
+        if task:
+            self.__uriText.insert("1.0",task.m3u8Url)
+            self.__downloadPath.set(task.downloadPath)
+            self.__taskName.set(task.taskName)
 
     def __continue_task(self):
         path = filedialog.askopenfilename(initialdir=self.downloadPath,filetypes=[('Text Files','.m3u8task')])
@@ -325,9 +329,11 @@ class NewTaskWindow:
 
         base.set_window_center_display(newTaskWindow)
 
-    def dispaly(self):
+    def dispaly(self,task = None):
         self.hasTask = False
         self.__init_window(1080,720)
+        if task:
+            self.__display_task(task)
         self._window.mainloop()
     
     def get_downtask(self):
@@ -355,12 +361,13 @@ if __name__ == '__main__':
     iscontinue = True
     window = NewTaskWindow()
     downthread = DownTask.DownTaskThread()
+    addSusseed = True
     while(iscontinue):
         iscontinue = False
-        window.dispaly()
+        window.dispaly(None if addSusseed else window.get_downtask())
 
         if window.hasTask:
-            downthread.add_task(window.get_downtask())
+            addSusseed = downthread.add_task(window.get_downtask())
             downthread.start_download()
             iscontinue = True
 
