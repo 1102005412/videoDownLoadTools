@@ -54,12 +54,13 @@ class M3u8Downloader:
         return task
 
     def __download_task(self):
-
+        ret = None
         while(True):
             task = self.__get_next_task()
             if not task:
                 return
-
+            if ret != None:
+                ret.close()
             ret = self.__try_get_url(task[0])
             if( ret == None or ret.status_code != 200):
                 self._downTaskLock.acquire()
@@ -170,7 +171,7 @@ class M3u8Downloader:
                 u3m8file.write(fileName + "\n")
             else:
                 u3m8file.write(line + "\n")
-
+        ret.close()
         u3m8file.close()
         print("%s下载成功" % (m3u8FileName))
 

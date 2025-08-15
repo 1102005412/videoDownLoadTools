@@ -118,8 +118,11 @@ class DownTaskThread:
         t.after(1000 * 30, t.destroy)  # 超时强制关闭‌:ml-citation{ref="6" data="citationList"}
         title = 'Download Succeed!' if ret else 'Download Fail!'
         answer = messagebox.askquestion(title, 'Do you want to download continue?',parent = t)
-        #t.protocol("WM_DELETE_WINDOW", t.quit)
-        #t.destroy()
+        try:
+            t.protocol("WM_DELETE_WINDOW", t.quit)
+            t.destroy()
+        except TclError:
+            pass
 
         if answer == 'yes':
             print("User selected yes.")
