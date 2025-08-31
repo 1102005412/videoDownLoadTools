@@ -32,7 +32,7 @@ class DownTaskThread:
         pygame.init()
         pygame.mixer.init()
 
-        soundPath =  "res/sound/"
+        soundPath =  base.resource_path("res/sound/")
         self.finishSound = pygame.mixer.Sound(soundPath + "download-complete.wav")
         self.finishSound.set_volume(1)
         self.errorSound = pygame.mixer.Sound(soundPath + "download-error.wav")

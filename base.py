@@ -1,3 +1,6 @@
+import sys
+import os
+
 def set_window_center_display(window):
     screen_width = window.winfo_screenwidth()
     screen_height = window.winfo_screenheight()
@@ -13,3 +16,8 @@ def set_window_center_display(window):
 
     # 设置窗口左上角的坐标
     window.geometry('{}x{}+{}+{}'.format(window_width,window_height,x, y))
+
+def resource_path(relative_path):
+    """获取资源绝对路径"""
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
