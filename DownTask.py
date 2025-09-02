@@ -28,6 +28,7 @@ class DownTaskThread:
         self.downThreadRun = False
         self.taskList = []
         self.taskListLock = threading.Lock()
+        self.exit = False
 
         pygame.init()
         pygame.mixer.init()
@@ -78,7 +79,8 @@ class DownTaskThread:
             self.downThread.start()
 
     def stop_download(self):
-        self.downThreadRun = False
+        M3u8Downloader.M3u8Downloader.onlySaveTask = True
+        self.exit = True
         if self.downThread:
             self.downThread.join()
             self.downThread = None
@@ -109,6 +111,8 @@ class DownTaskThread:
                     print("All tasks have been downloaded!!!")
                     self.allFinishSound.play()
                     allFinished = False
+                if self.exit:
+                    break
                 time.sleep(1)
 
     def isContinue(self,ret):

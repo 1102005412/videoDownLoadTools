@@ -10,6 +10,7 @@ from M3u8Downloader import M3u8Downloader
 import DownTask
 import base
 import sys
+import time
 
 def is_valid_filename(filename: str, allow_dots: bool = False) -> bool:
     """
@@ -75,6 +76,7 @@ class NewTaskWindow:
         self.threadCount = 10
         self.timeout = 30
         self.retry = 5
+        self.exit = False
 
         self.__read_config()
 
@@ -158,20 +160,8 @@ class NewTaskWindow:
             self.__downloadPath.set(task.downloadPath)
             self.__taskName.set(task.taskName)
 
-    def __continue_task(self):
-        path = filedialog.askopenfilename(initialdir=self.downloadPath,filetypes=[('Text Files','.m3u8task')])
-        if path == None or len(path) == 0:
-            return
-        task = M3u8Downloader.loadTask(path)
-        if task == None:
-            return
-        self.m3u8Url = task[0]
-        self.downloadPath = task[1]
-        self.taskName = task[2]
-        self.hasTask = True
-        self.threadCount = int(self.__threadCount.get())
-        self.timeout = int(self.__timeout.get())
-        self.retry = int(self.__retry.get())
+    def __safe_exit(self):
+        self.exit = True
         self._window.protocol("WM_DELETE_WINDOW", self._window.quit)
         self._window.destroy()
 
@@ -237,11 +227,11 @@ class NewTaskWindow:
         command = self.__load_task)
         ToolTip(loadTaskBtn,"导入之前未下载完的任务")
 
-        continueTaskBtn = Button(buttonframe,text = "继续下载",
+        safeExitBtn = Button(buttonframe,text = "安全退出",
         fg = "red",height = 1,
         font = ('楷体',10,'bold'),
-        command = self.__continue_task)
-        ToolTip(continueTaskBtn,"继续之前未下载完的任务")
+        command = self.__safe_exit)
+        ToolTip(safeExitBtn,"停止所有任务安全退出")
 
         taskNameLable = Label(newTaskWindow,text="任务名称:")
         taskNameEntry = Entry(newTaskWindow,textvariable = self.__taskName)
@@ -305,7 +295,7 @@ class NewTaskWindow:
         row = row + 1
         buttonframe.grid(row=row,column=1,sticky=N+S+W+E)
         loadTaskBtn.grid(row=1,column=1,sticky=N+S+E+W,padx=5)
-        continueTaskBtn.grid(row=1,column=2,sticky=N+S+E+W,padx=5)
+        safeExitBtn.grid(row=1,column=2,sticky=N+S+E+W,padx=5)
         startTaskBtn.grid(row=1,column=3,sticky=N+S+W+E,padx=5)
         buttonframe.grid_rowconfigure(0,weight=2)
         buttonframe.grid_rowconfigure(1,weight=1)
@@ -318,7 +308,7 @@ class NewTaskWindow:
         buttonframe.grid_columnconfigure(4,weight=2)
 
         #startTaskBtn.grid(row=row,column=1,sticky=N,pady=5,ipadx=10,ipady=10)
-        #continueTaskBtn.grid(row=row,column=2,sticky=N,pady=5,ipadx=10,ipady=10)
+        #safeExitBtn.grid(row=row,column=2,sticky=N,pady=5,ipadx=10,ipady=10)
 
         newTaskWindow.grid_columnconfigure(0,weight=1)
         newTaskWindow.grid_columnconfigure(1,weight=5)
@@ -370,8 +360,10 @@ if __name__ == '__main__':
             addSusseed = downthread.add_task(window.get_downtask())
             downthread.start_download()
             iscontinue = True
-
-    downthread.stop_download()
-    downthread.save_task_list()
-    window.save_config()
     
+    print("Saving and exiting...")
+    downthread.stop_download()
+    #downthread.save_task_list()
+    window.save_config()
+    print("Exiting in 3 seconds...")
+    time.sleep(3)

@@ -11,6 +11,7 @@ import DownTask
 #import ffmpeg    #这个库还是需要依赖ffmpeg，不如直接调ffmpeg命令行
 
 class M3u8Downloader:
+    onlySaveTask = False
 
     def __init__(self,threadCount = 10,timeout = 30,retry = 5):
         self._downTaskLock = threading.Lock()
@@ -55,7 +56,7 @@ class M3u8Downloader:
 
     def __download_task(self):
         ret = None
-        while(True):
+        while(M3u8Downloader.onlySaveTask == False):
             task = self.__get_next_task()
             if not task:
                 return
@@ -110,7 +111,7 @@ class M3u8Downloader:
 
     def __try_get_url(self,url):
         count = 0
-        while True:
+        while M3u8Downloader.onlySaveTask == False:
             try:
                 count += 1
                 if count > self._retry:
@@ -142,14 +143,7 @@ class M3u8Downloader:
     def __download_m3u8_file(self,m3u8Url,outputPath,taskName):
         m3u8UrlSplit = m3u8Url.split('/')
         m3u8FileName = m3u8UrlSplit.pop().split('?')[0]
-
         taskPath = outputPath + "/" + taskName
-        if os.path.exists(taskPath):
-            pass
-        else:
-            os.mkdir(taskPath)
-
-        M3u8Downloader.saveTask(m3u8Url,outputPath,taskName)
 
         ret = self.__try_get_url(m3u8Url)
         if ret == None or ret.status_code != 200 :
@@ -229,6 +223,10 @@ class M3u8Downloader:
 
     def down(self,m3u8Url,outputPath,taskName):
         try:
+            M3u8Downloader.saveTask(m3u8Url,outputPath,taskName)
+            if M3u8Downloader.onlySaveTask:
+                return True
+ 
             m3u8Data = self.__download_m3u8_file(m3u8Url,outputPath,taskName)
             if(None == m3u8Data):
                 return False
@@ -240,6 +238,10 @@ class M3u8Downloader:
             
         tsList = self.__get_ts_list(m3u8Data)
         self.__download_ts_list(tsList)
+
+        if M3u8Downloader.onlySaveTask:
+                return True
+        
         return self.__combine_ts_list(m3u8Url)
         # if(!self)
         # ts_list = get_ts_list(m3_path)
@@ -247,8 +249,12 @@ class M3u8Downloader:
     
     @staticmethod
     def saveTask(m3u8Url,outputPath,taskName):
+        taskPath = outputPath + "/" + taskName
+        if os.path.exists(taskPath) == False:
+            os.mkdir(taskPath)
+
         #保存任务信息，如果失败可以重新下载
-        taskfile = outputPath + "/" + taskName + "/" + taskName + ".m3u8task"
+        taskfile = taskPath + "/" + taskName + ".m3u8task"
         with open(taskfile, "wt",encoding='utf-8') as urlFile:
             urlFile.write(m3u8Url + '\n')
             urlFile.write(outputPath + '\n')
