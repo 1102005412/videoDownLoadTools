@@ -133,7 +133,6 @@ class NewTaskWindow:
         elif os.path.exists(path) == False:
             messagebox.showerror("错误","下载路径不存在，请输入有效的下载路径")
         else: 
-            self._window.protocol("WM_DELETE_WINDOW", self._window.quit)
             self._window.destroy()
             self.downloadPath = path
             self.m3u8Url = url
@@ -162,7 +161,6 @@ class NewTaskWindow:
 
     def __safe_exit(self):
         self.exit = True
-        self._window.protocol("WM_DELETE_WINDOW", self._window.quit)
         self._window.destroy()
 
     def __get_timestamp(self):
@@ -336,7 +334,6 @@ def isContinue(ret):
 
     title = 'Download Succeed!' if ret else 'Download Fail!'
     answer = messagebox.askquestion(title, 'Do you want to download continue?',parent=t)
-    t.protocol("WM_DELETE_WINDOW", t.quit)
     t.destroy()
 
     if answer == 'yes':

@@ -63,7 +63,6 @@ class DownTaskThread:
         else:
             title = 'add Fail!'
             answer = messagebox.showinfo(title, 'The url already exists in the download queue,current download queue len is %d' % num,parent=t)
-        t.protocol("WM_DELETE_WINDOW", t.quit)
         t.destroy()
         return taskInList == False
 
@@ -123,7 +122,6 @@ class DownTaskThread:
         title = 'Download Succeed!' if ret else 'Download Fail!'
         answer = messagebox.askquestion(title, 'Do you want to download continue?',parent = t)
         try:
-            t.protocol("WM_DELETE_WINDOW", t.quit)
             t.destroy()
         except TclError:
             pass
