@@ -38,7 +38,8 @@ class ToolTipImp:
         widget.unbind('<Enter>')
         widget.unbind('<Leave>')
         widget.unbind('<Destroy>')
-        self.tooltip.destroy()
+        if self.tooltip != None:
+            self.tooltip.destroy()
         self.tooltip = None
         widget.tooltip = None
 
