@@ -306,9 +306,9 @@ class NewTaskWindow(TaskChangedObserver):
         self.__update_task_frame(queue_window)
 
         self.__update_task_id = queue_window.after(1000,self.__update_task_frame,queue_window)
-        self._window.attributes('-disabled', 1)  # 禁用主窗口
+        # self._window.attributes('-disabled', 1)  # 禁用主窗口
         self._window.wait_window(queue_window)  # 等待窗口关闭
-        self._window.attributes('-disabled', 0)  # 重新启用主窗口
+        # self._window.attributes('-disabled', 0)  # 重新启用主窗口
         queue_window.after_cancel(self.__update_task_id)
         self._window.lift()
 
