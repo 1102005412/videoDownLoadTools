@@ -96,6 +96,7 @@ class NewTaskWindow(TaskChangedObserver):
         self.__queue_lock = threading.Lock()
 
         self.__read_config()
+        self.__downthread = DownTask.DownTaskThread()
 
     #观察者模式
     def on_task_changed(self,lastTask,currentTask,waitingQueue):
@@ -161,7 +162,6 @@ class NewTaskWindow(TaskChangedObserver):
         elif os.path.exists(path) == False:
             messagebox.showerror("错误","下载路径不存在，请输入有效的下载路径")
         else: 
-            self._window.destroy()
             self.downloadPath = path
             self.m3u8Url = url
             self.taskName = taskName
@@ -171,6 +171,18 @@ class NewTaskWindow(TaskChangedObserver):
             self.threadCount = int(self.__threadCount.get())
             self.timeout = int(self.__timeout.get())
             self.retry = int(self.__retry.get())
+            ret = self.__downthread.add_task(self.get_downtask())
+            num = len(self.__waiting_queue)
+            if ret:
+                title = 'add Succeed!'
+                messagebox.showinfo(title, 'current download queue len is %d' % num,parent=self._window)
+            else:
+                title = 'add Fail!'
+                messagebox.showinfo(title, 'The url already exists in the download queue,current download queue len is %d' % num,parent=self._window)
+            
+            self.__uriText.delete("1.0", "end")  # 从第一行第一个字符删除到末尾
+            self.__taskName.set('')
+            self._window.focus_set()
 
     def __load_task(self):
         path = filedialog.askopenfilename(initialdir=self.downloadPath,filetypes=[('Text Files','.m3u8task')])
@@ -461,12 +473,18 @@ class NewTaskWindow(TaskChangedObserver):
         base.set_window_center_display(newTaskWindow)
         newTaskWindow.lift()
 
-    def dispaly(self,task = None):
+    def dispaly(self):
         self.hasTask = False
         self.__init_window(1080,720)
-        if task:
-            self.__display_task(task)
+        self.__downthread.add_observer(self)
+        self.__downthread.start_download()
         self._window.mainloop()
+
+        print("Saving and exiting...")
+        self.__downthread.remove_observer(self)
+        self.__downthread.stop_download()
+        #downthread.save_task_list()
+        self.save_config()
     
     def get_downtask(self):
         return DownTask.DownTask(self.m3u8Url,self.downloadPath,self.taskName,self.threadCount,self.timeout,self.retry)
@@ -489,24 +507,7 @@ def isContinue(ret):
 
 
 if __name__ == '__main__':
-    iscontinue = True
     window = NewTaskWindow()
-    downthread = DownTask.DownTaskThread()
-    downthread.add_observer(window)
-    addSusseed = True
-    while(iscontinue):
-        iscontinue = False
-        window.dispaly(None if addSusseed else window.get_downtask())
-
-        if window.hasTask:
-            addSusseed = downthread.add_task(window.get_downtask())
-            downthread.start_download()
-            iscontinue = True
-    
-    print("Saving and exiting...")
-    downthread.stop_download()
-    downthread.remove_observer(window)
-    #downthread.save_task_list()
-    window.save_config()
+    window.dispaly()
     print("Exiting in 3 seconds...")
     time.sleep(3)

@@ -69,20 +69,7 @@ class DownTaskThread:
             self.taskList.append(task)
             waitQueue.append(task.taskName)
             self.notify_observers(None,self.__currentTaskName,waitQueue)
-        num = len(self.taskList)
         self.taskListLock.release()
-        
-        t = Tk()
-        t.geometry('%dx%d' % (0,0))
-        base.set_window_center_display(t)
-
-        if taskInList == False:
-            title = 'add Succeed!'
-            answer = messagebox.showinfo(title, 'current download queue len is %d' % num,parent=t)
-        else:
-            title = 'add Fail!'
-            answer = messagebox.showinfo(title, 'The url already exists in the download queue,current download queue len is %d' % num,parent=t)
-        t.destroy()
         return taskInList == False
 
     def start_download(self):
