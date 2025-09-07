@@ -1,6 +1,6 @@
 from tkinter import *
 import tkinter.filedialog as filedialog
-from tkinter import messagebox
+from tkinter import messagebox,ttk
 import datetime
 import configparser
 import os
@@ -11,6 +11,8 @@ import DownTask
 import base
 import sys
 import time
+import threading
+from abc import ABC, abstractmethod
 
 def is_valid_filename(filename: str, allow_dots: bool = False) -> bool:
     """
@@ -69,7 +71,13 @@ def try_read_config(config,selection,name):
     except:
         return None
 
-class NewTaskWindow:
+# 观察者接口
+class TaskChangedObserver(ABC):
+    @abstractmethod
+    def on_task_changed(self, progress, status):
+        pass
+
+class NewTaskWindow(TaskChangedObserver):
     def __init__(self):
         self.__configFileName = "taskConfig.ini"
         self.downloadPath = ""
@@ -78,7 +86,27 @@ class NewTaskWindow:
         self.retry = 5
         self.exit = False
 
+        self.__waiting_frame = None
+        self.__active_frame = None
+        self.__completed_frame = None
+        self.__notebook = None
+        self.__waiting_queue = []
+        self.__active_queue = []
+        self.__completed_queue = []
+        self.__queue_lock = threading.Lock()
+
         self.__read_config()
+
+    #观察者模式
+    def on_task_changed(self,lastTask,currentTask,waitingQueue):
+        self.__queue_lock.acquire()
+        if lastTask:
+            self.__completed_queue.insert(0,lastTask)
+        self.__active_queue = []
+        if currentTask:
+            self.__active_queue.append(currentTask)
+        self.__waiting_queue = waitingQueue
+        self.__queue_lock.release()
 
     def __read_config(self):
         configFileName = self.__configFileName
@@ -179,6 +207,118 @@ class NewTaskWindow:
         
         widget.insert(index,clipboard_content)
 
+    def __create_task_table(self, parent, tasks):
+        frame = parent
+        for widget in frame.winfo_children():
+            widget.destroy()
+
+        """创建任务表格"""
+        if not tasks:
+            ttk.Label(parent, text="没有任务", font=('Arial', 14)).pack(expand=True)
+            return
+
+        # 创建框架
+        # frame = ttk.Frame(parent)
+        # frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 创建树形视图
+        columns = ('name')#, 'url', 'status', 'progress', 'speed', 'size')
+        tree = ttk.Treeview(frame, show='headings', height=10, columns=columns)
+        
+        # # 定义列
+        tree.heading('name', text='任务名称')
+        # tree.heading('url', text='URL')
+        # # 设置列宽
+        # tree.column('name', width=50)
+        # 添加数据
+        for task in tasks:
+            tree.insert('', 'end', values=(
+                task,
+            ))
+
+        # 添加滚动条
+        scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    def __update_task_frame(self,queue_window):
+        self.__queue_lock.acquire()
+
+        self.__notebook.tab(0, text=f"等待中 ({len(self.__waiting_queue)})")
+        self.__notebook.tab(1, text=f"下载中 ({len(self.__active_queue)})")
+        self.__notebook.tab(2, text=f"已完成 ({len(self.__completed_queue)})")
+
+        if self.__waiting_frame:
+            self.__create_task_table(self.__waiting_frame,self.__waiting_queue)
+
+        if self.__active_frame:
+            self.__create_task_table(self.__active_frame,self.__active_queue)
+
+        if self.__completed_frame:
+            self.__create_task_table(self.__completed_frame,self.__completed_queue)
+        
+        self.__update_task_id = queue_window.after(1000,self.__update_task_frame,queue_window)
+        self.__queue_lock.release()
+
+    def __view_task_queue(self):
+        """查看任务队列详情"""
+        # 创建新窗口显示任务队列详情
+        queue_window = tk.Toplevel(self._window)
+        queue_window.title("任务队列详情")
+        window_width = self._window.winfo_width()
+        window_height = self._window.winfo_height()
+        width = window_width * 3 // 4
+        height = window_height * 3 // 4
+        window_x = self._window.winfo_x()
+        window_y = self._window.winfo_y()
+        pos_x = window_x + (window_width - width) // 2
+        pos_y = window_y + (window_height - height) // 2
+        
+        queue_window.geometry('%dx%d+%d+%d' % (width, height, pos_x, pos_y))
+        queue_window.transient(self._window)  # 设置为主窗口的临时窗口
+        queue_window.grab_set()       # 捕获焦点，防止主窗口被操作
+        
+        # 创建笔记本控件显示不同状态的任务
+        notebook = ttk.Notebook(queue_window)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # 等待中任务标签页
+        waiting_frame = ttk.Frame(notebook, padding=10)
+        notebook.add(waiting_frame)
+
+        # 下载中任务标签页
+        active_frame = ttk.Frame(notebook, padding=10)
+        notebook.add(active_frame)
+
+        # 已完成任务标签页
+        completed_frame = ttk.Frame(notebook, padding=10)
+        notebook.add(completed_frame)
+
+        self.__queue_lock.acquire()
+        self.__waiting_frame = waiting_frame
+        self.__active_frame = active_frame
+        self.__completed_frame = completed_frame
+        self.__notebook = notebook
+        self.__queue_lock.release()
+
+        self.__update_task_frame(queue_window)
+
+        self.__update_task_id = queue_window.after(1000,self.__update_task_frame,queue_window)
+        self._window.attributes('-disabled', 1)  # 禁用主窗口
+        self._window.wait_window(queue_window)  # 等待窗口关闭
+        self._window.attributes('-disabled', 0)  # 重新启用主窗口
+        queue_window.after_cancel(self.__update_task_id)
+        self._window.lift()
+
+        self.__queue_lock.acquire()
+        self.__waiting_frame = None
+        self.__active_frame = None
+        self.__completed_frame = None
+        self.__notebook = None
+        self.__queue_lock.release()
+
     def __init_window(self,width,height):
         newTaskWindow = Tk()
         self._window = newTaskWindow
@@ -234,6 +374,8 @@ class NewTaskWindow:
         taskNameLable = Label(newTaskWindow,text="任务名称:")
         taskNameEntry = Entry(newTaskWindow,textvariable = self.__taskName)
         taskNameEntry.bind('<ButtonRelease-3>',self.__do_paste)
+
+        viewQueueBtn = Button(newTaskWindow, text="查看任务队列", command=self.__view_task_queue)
 
         row = 1
         urlLable.grid(row=row,column=0,pady=5,sticky=E+N)
@@ -295,6 +437,7 @@ class NewTaskWindow:
         loadTaskBtn.grid(row=1,column=1,sticky=N+S+E+W,padx=5)
         safeExitBtn.grid(row=1,column=2,sticky=N+S+E+W,padx=5)
         startTaskBtn.grid(row=1,column=3,sticky=N+S+W+E,padx=5)
+        viewQueueBtn.grid(row=row,column=2,sticky=S+E,padx=5,pady=5)
         buttonframe.grid_rowconfigure(0,weight=2)
         buttonframe.grid_rowconfigure(1,weight=1)
         buttonframe.grid_rowconfigure(2,weight=3)
@@ -316,6 +459,7 @@ class NewTaskWindow:
         newTaskWindow.grid_rowconfigure(row,weight=3)
 
         base.set_window_center_display(newTaskWindow)
+        newTaskWindow.lift()
 
     def dispaly(self,task = None):
         self.hasTask = False
@@ -348,6 +492,7 @@ if __name__ == '__main__':
     iscontinue = True
     window = NewTaskWindow()
     downthread = DownTask.DownTaskThread()
+    downthread.add_observer(window)
     addSusseed = True
     while(iscontinue):
         iscontinue = False
@@ -360,6 +505,7 @@ if __name__ == '__main__':
     
     print("Saving and exiting...")
     downthread.stop_download()
+    downthread.remove_observer(window)
     #downthread.save_task_list()
     window.save_config()
     print("Exiting in 3 seconds...")
