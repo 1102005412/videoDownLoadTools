@@ -5,6 +5,43 @@ from tkinter import *
 from tkinter import messagebox
 import base
 import pygame
+from abc import ABC, abstractmethod
+
+# 观察者接口
+class TaskChangedObserver(ABC):
+    @abstractmethod
+    def on_task_start(self, task):
+        pass
+    @abstractmethod
+    def on_task_finished(self, task):
+        pass
+    @abstractmethod
+    def on_task_append(self, task):
+        pass
+
+class TaskChangedObservable:
+    def __init__(self):
+        self.observers = []  # 存储观察者
+
+    def add_observer(self, observer):
+        if observer not in self.observers:
+            self.observers.append(observer)
+    
+    def remove_observer(self, observer):
+        if observer in self.observers:
+            self.observers.remove(observer)
+    
+    def notify_task_start(self, task):
+        for observer in self.observers:
+            observer.on_task_start(task)
+    
+    def notify_task_finished(self, task):
+        for observer in self.observers:
+            observer.on_task_finished(task)
+
+    def notify_task_append(self, task):
+        for observer in self.observers:
+            observer.on_task_append(task)
 
 class DownTask:
     def __init__(self,m3u8Url,downloadPath,taskName,threadCount = 10,timeout = 30,retry = 5):
@@ -22,8 +59,9 @@ class DownTask:
         return M3u8Downloader.startTask(self.m3u8Url,self.downloadPath,self.taskName,\
                                         self.threadCount,self.timeout,self.retry)
 
-class DownTaskThread:
+class DownTaskThread(TaskChangedObservable):
     def __init__(self):
+        super().__init__()
         self.downThread = None
         self.downThreadRun = False
         self.taskList = []
@@ -40,37 +78,20 @@ class DownTaskThread:
         self.errorSound.set_volume(1)
         self.allFinishSound = pygame.mixer.Sound(soundPath + "all-finished.wav")
         self.allFinishSound.set_volume(1)
-        self.observers = []  # 存储观察者
-        self.__currentTaskName = None
-
-    def add_observer(self, observer):
-        if observer not in self.observers:
-            self.observers.append(observer)
-    
-    def remove_observer(self, observer):
-        if observer in self.observers:
-            self.observers.remove(observer)
-    
-    def notify_observers(self, lastTask,currentTask,waitingQueue):
-        # 通知所有观察者
-        for observer in self.observers:
-            observer.on_task_changed(lastTask,currentTask,waitingQueue)
 
     def add_task(self,task):
         taskInList = False
-        waitQueue = []
         self.taskListLock.acquire()
         for t in self.taskList:
-            waitQueue.append(t.taskName)
             if task.m3u8Url == t.m3u8Url:
                 taskInList = True
                 break
         if taskInList == False:
             self.taskList.append(task)
-            waitQueue.append(task.taskName)
-            self.notify_observers(None,self.__currentTaskName,waitQueue)
+            self.notify_task_append(task)
+        num = len(self.taskList)
         self.taskListLock.release()
-        return taskInList == False
+        return [taskInList == False,num]
 
     def start_download(self):
         if self.downThread is None:
@@ -93,23 +114,16 @@ class DownTaskThread:
     def download_thread(self):
         allFinished = False
         task = None
-        lastName = None
         while self.downThreadRun:
             task = None
-            waitQueue = []
             self.taskListLock.acquire()
             if len(self.taskList) > 0:
                 task = self.taskList.pop(0)
                 allFinished = True
-            for t in self.taskList:
-                waitQueue.append(t.taskName)
-
-            self.__currentTaskName = task.taskName if task else None
-            self.notify_observers(lastName,self.__currentTaskName,waitQueue)
             self.taskListLock.release()
-            lastName = None
 
             if task:
+                self.notify_task_start(task)
                 ret = task.start()
                 if ret == False:
                     self.taskListLock.acquire()
@@ -119,7 +133,7 @@ class DownTaskThread:
                     if self.isContinue(ret) == False:
                         self.downThreadRun = False
                 else:
-                    lastName = task.taskName
+                    self.notify_task_finished(task)
                     self.finishSound.play()
             else:
                 if allFinished:

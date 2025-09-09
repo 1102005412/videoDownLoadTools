@@ -12,7 +12,6 @@ import base
 import sys
 import time
 import threading
-from abc import ABC, abstractmethod
 
 def is_valid_filename(filename: str, allow_dots: bool = False) -> bool:
     """
@@ -71,13 +70,7 @@ def try_read_config(config,selection,name):
     except:
         return None
 
-# 观察者接口
-class TaskChangedObserver(ABC):
-    @abstractmethod
-    def on_task_changed(self, progress, status):
-        pass
-
-class NewTaskWindow(TaskChangedObserver):
+class NewTaskWindow(DownTask.TaskChangedObserver):
     def __init__(self):
         self.__configFileName = "taskConfig.ini"
         self.downloadPath = ""
@@ -93,20 +86,38 @@ class NewTaskWindow(TaskChangedObserver):
         self.__waiting_queue = []
         self.__active_queue = []
         self.__completed_queue = []
+
+        self.__waiting_add = []
+        self.__waiting_remove = []
+        self.__active_add = []
+        self.__active_remove = []
+        self.__completed_add = []
+
         self.__queue_lock = threading.Lock()
 
         self.__read_config()
         self.__downthread = DownTask.DownTaskThread()
 
-    #观察者模式
-    def on_task_changed(self,lastTask,currentTask,waitingQueue):
+    def on_task_start(self,task):
         self.__queue_lock.acquire()
-        if lastTask:
-            self.__completed_queue.insert(0,lastTask)
-        self.__active_queue = []
-        if currentTask:
-            self.__active_queue.append(currentTask)
-        self.__waiting_queue = waitingQueue
+        self.__active_add.append(task.taskName)
+        self.__waiting_remove.append(task.taskName)
+        self.__active_queue.append(task.taskName)
+        self.__waiting_queue.remove(task.taskName)
+        self.__queue_lock.release()
+    
+    def on_task_finished(self,task):
+        self.__queue_lock.acquire()
+        self.__active_remove.append(task.taskName)
+        self.__completed_add.append(task.taskName)
+        self.__active_queue.remove(task.taskName)
+        self.__completed_queue.append(task.taskName)
+        self.__queue_lock.release()
+
+    def on_task_append(self, task):
+        self.__queue_lock.acquire()
+        self.__waiting_add.append(task.taskName)
+        self.__waiting_queue.append(task.taskName)
         self.__queue_lock.release()
 
     def __read_config(self):
@@ -172,8 +183,8 @@ class NewTaskWindow(TaskChangedObserver):
             self.timeout = int(self.__timeout.get())
             self.retry = int(self.__retry.get())
             ret = self.__downthread.add_task(self.get_downtask())
-            num = len(self.__waiting_queue)
-            if ret:
+            num = ret[1]
+            if ret[0]:
                 title = 'add Succeed!'
                 messagebox.showinfo(title, 'current download queue len is %d' % num,parent=self._window)
             else:
@@ -219,58 +230,90 @@ class NewTaskWindow(TaskChangedObserver):
         
         widget.insert(index,clipboard_content)
 
-    def __create_task_table(self, parent, tasks):
-        frame = parent
-        for widget in frame.winfo_children():
+    def __find_task_view(self,parent):
+        tree = None
+        for widget in parent.winfo_children():
+            if type(widget) is ttk.Treeview:
+                tree = widget
+                break
+        return tree
+
+    def __create_task_view(self,parent):
+        for widget in parent.winfo_children():
             widget.destroy()
-
-        """创建任务表格"""
-        if not tasks:
-            ttk.Label(parent, text="没有任务", font=('Arial', 14)).pack(expand=True)
-            return
-
-        # 创建框架
-        # frame = ttk.Frame(parent)
-        # frame.pack(fill=tk.BOTH, expand=True)
-        
         # 创建树形视图
-        columns = ('name')#, 'url', 'status', 'progress', 'speed', 'size')
-        tree = ttk.Treeview(frame, show='headings', height=10, columns=columns)
-        
+        # columns = ('name')#, 'url', 'status', 'progress', 'speed', 'size')
+        tree = ttk.Treeview(parent, show='tree headings', height=10)#, columns=columns)
         # # 定义列
-        tree.heading('name', text='任务名称')
-        # tree.heading('url', text='URL')
-        # # 设置列宽
-        # tree.column('name', width=50)
-        # 添加数据
-        for task in tasks:
-            tree.insert('', 'end', values=(
-                task,
-            ))
-
+        tree.heading("#0", text="任务名称")  # 树列 (#0) 的表头
+        # tree.heading('name', text='任务名称')
+        tree.column("#0",anchor=tk.W)
         # 添加滚动条
-        scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=tree.yview)
+        scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=tree.yview)
         tree.configure(yscrollcommand=scrollbar.set)
         
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        return tree
+
+    def __del_task_view(self,parent,tasks):
+        view = self.__find_task_view(parent)
+        if view == None:
+            return 0
+        if not tasks:
+            return len(view.get_children())
+        del_list = []
+        items = view.get_children()
+        for t in tasks:
+            for it in items:
+                if t == view.item(it,'text'):
+                    del_list.append(it)
+        for it in del_list:
+            view.delete(it)
+
+        num = len(view.get_children())
+        if num == 0:
+            for widget in parent.winfo_children():
+                widget.destroy()
+            ttk.Label(parent, text="没有任务", font=('Arial', 14)).pack(expand=True)
+            return 0
+        return num
+
+    def __append_task_view(self,parent,tasks,append = True):
+        view = self.__find_task_view(parent)
+        if not tasks:
+            if view == None:
+                return 0
+            else:
+                return len(view.get_children())
+
+        if view == None:
+            view = self.__create_task_view(parent)
+        for task in tasks:
+            view.insert('', 'end' if append else 0, text = task)
+        return len(view.get_children())     
 
     def __update_task_frame(self,queue_window):
+        num = 0
         self.__queue_lock.acquire()
-
-        self.__notebook.tab(0, text=f"等待中 ({len(self.__waiting_queue)})")
-        self.__notebook.tab(1, text=f"下载中 ({len(self.__active_queue)})")
-        self.__notebook.tab(2, text=f"已完成 ({len(self.__completed_queue)})")
-
         if self.__waiting_frame:
-            self.__create_task_table(self.__waiting_frame,self.__waiting_queue)
+            self.__append_task_view(self.__waiting_frame,self.__waiting_add)
+            num = self.__del_task_view(self.__waiting_frame,self.__waiting_remove)
+        self.__notebook.tab(0, text=f"等待中 ({num})")
 
         if self.__active_frame:
-            self.__create_task_table(self.__active_frame,self.__active_queue)
+            self.__append_task_view(self.__active_frame,self.__active_add)
+            num = self.__del_task_view(self.__active_frame,self.__active_remove)
+        self.__notebook.tab(1, text=f"下载中 ({num})")
 
         if self.__completed_frame:
-            self.__create_task_table(self.__completed_frame,self.__completed_queue)
-        
+            num = self.__append_task_view(self.__completed_frame,self.__completed_add,False)
+        self.__notebook.tab(2, text=f"已完成 ({num})")
+        self.__waiting_add.clear()
+        self.__waiting_remove.clear()
+        self.__active_add.clear()
+        self.__active_remove.clear()
+        self.__completed_add.clear()
         self.__update_task_id = queue_window.after(1000,self.__update_task_frame,queue_window)
         self.__queue_lock.release()
 
@@ -313,23 +356,44 @@ class NewTaskWindow(TaskChangedObserver):
         self.__active_frame = active_frame
         self.__completed_frame = completed_frame
         self.__notebook = notebook
-        self.__queue_lock.release()
+        num = 0
+        num = self.__append_task_view(self.__waiting_frame,self.__waiting_queue)
+        self.__notebook.tab(0, text=f"等待中 ({num})")
+        if num == 0:
+            ttk.Label(self.__waiting_frame, text="没有任务", font=('Arial', 14)).pack(expand=True)
 
-        self.__update_task_frame(queue_window)
+        num = self.__append_task_view(self.__active_frame,self.__active_queue)
+        self.__notebook.tab(1, text=f"下载中 ({num})")
+        if num == 0:
+            ttk.Label(self.__active_frame, text="没有任务", font=('Arial', 14)).pack(expand=True)
+
+        num = self.__append_task_view(self.__completed_frame,self.__completed_queue,False)
+        self.__notebook.tab(2, text=f"已完成 ({num})")
+        if num == 0:
+            ttk.Label(self.__completed_frame, text="没有任务", font=('Arial', 14)).pack(expand=True)
+
+        self.__waiting_add.clear()
+        self.__waiting_remove.clear()
+        self.__active_add.clear()
+        self.__active_remove.clear()
+        self.__completed_add.clear()
+        self.__queue_lock.release()
 
         self.__update_task_id = queue_window.after(1000,self.__update_task_frame,queue_window)
         # self._window.attributes('-disabled', 1)  # 禁用主窗口
         self._window.wait_window(queue_window)  # 等待窗口关闭
         # self._window.attributes('-disabled', 0)  # 重新启用主窗口
-        queue_window.after_cancel(self.__update_task_id)
-        self._window.lift()
-
         self.__queue_lock.acquire()
+        queue_window.after_cancel(self.__update_task_id)
         self.__waiting_frame = None
         self.__active_frame = None
         self.__completed_frame = None
         self.__notebook = None
         self.__queue_lock.release()
+        self._window.lift()
+
+    def __set_window_center_display(self,event):
+        base.set_window_center_display(self._window)
 
     def __init_window(self,width,height):
         newTaskWindow = Tk()
@@ -340,7 +404,7 @@ class NewTaskWindow(TaskChangedObserver):
         self.__timeout = StringVar(value = self.timeout)
         self.__retry = StringVar(value = self.retry)
 
-        newTaskWindow.title("new task")
+        newTaskWindow.title("MyVideoDownloader")
         newTaskWindow.geometry('%dx%d' % (width,height))
         #newTaskWindow.resizable(0, 0)
 
@@ -470,7 +534,8 @@ class NewTaskWindow(TaskChangedObserver):
         newTaskWindow.grid_rowconfigure(1,weight=3)
         newTaskWindow.grid_rowconfigure(row,weight=3)
 
-        base.set_window_center_display(newTaskWindow)
+        #base.set_window_center_display(newTaskWindow)
+        newTaskWindow.bind("<Map>", self.__set_window_center_display)
         newTaskWindow.lift()
 
     def dispaly(self):
