@@ -255,6 +255,8 @@ class M3u8Downloader:
 
         #保存任务信息，如果失败可以重新下载
         taskfile = taskPath + "/" + taskName + ".m3u8task"
+        if len(taskfile) > 255:
+            taskfile = taskPath + "/task.m3u8task"
         with open(taskfile, "wt",encoding='utf-8') as urlFile:
             urlFile.write(m3u8Url + '\n')
             urlFile.write(outputPath + '\n')
