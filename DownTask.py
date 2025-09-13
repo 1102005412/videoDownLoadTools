@@ -39,6 +39,10 @@ class TaskChangedObservable:
         for observer in self.observers:
             observer.on_task_finished(task)
 
+    def notify_task_error(self, task):
+        for observer in self.observers:
+            observer.on_task_error(task)
+
     def notify_task_append(self, task):
         for observer in self.observers:
             observer.on_task_append(task)
@@ -128,7 +132,9 @@ class DownTaskThread(TaskChangedObservable):
                 if ret == False:
                     self.taskListLock.acquire()
                     self.taskList.append(task)
+                    self.notify_task_append(task)
                     self.taskListLock.release()
+                    self.notify_task_error(task)
                     self.errorSound.play()
                     if self.isContinue(ret) == False:
                         self.downThreadRun = False

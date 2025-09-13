@@ -114,6 +114,12 @@ class NewTaskWindow(DownTask.TaskChangedObserver):
         self.__completed_queue.append(task.taskName)
         self.__queue_lock.release()
 
+    def on_task_error(self,task):
+        self.__queue_lock.acquire()
+        self.__active_remove.append(task.taskName)
+        self.__active_queue.remove(task.taskName)
+        self.__queue_lock.release()
+
     def on_task_append(self, task):
         self.__queue_lock.acquire()
         self.__waiting_add.append(task.taskName)
