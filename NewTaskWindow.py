@@ -178,6 +178,8 @@ class NewTaskWindow(DownTask.TaskChangedObserver):
             messagebox.showerror("错误","请输入符合文件系统命名规则的任务名称")
         elif os.path.exists(path) == False:
             messagebox.showerror("错误","下载路径不存在，请输入有效的下载路径")
+        elif len(path + taskName) > 200:
+            messagebox.showerror("错误","任务名称过长")
         else: 
             self.downloadPath = path
             self.m3u8Url = url
