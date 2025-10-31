@@ -214,6 +214,7 @@ class NewTaskWindow(DownTask.TaskChangedObserver):
     
     def __display_task(self,task):
         if task:
+            self.__uriText.delete("1.0", "end")  # 从第一行第一个字符删除到末尾
             self.__uriText.insert("1.0",task.m3u8Url)
             self.__downloadPath.set(task.downloadPath)
             self.__taskName.set(task.taskName)
