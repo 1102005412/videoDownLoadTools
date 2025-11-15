@@ -206,8 +206,9 @@ class M3u8Downloader:
         #stream = ffmpeg.output(stream,self._outputPath + "/" + outputFile + ".mp4",c="copy")
         #ffmpeg.run(stream)
 
-        command = ['ffmpeg','-i',inputPath,
-            '-c','copy',outputPatn]
+        ffmpeg_cmd_path = os.path.dirname(os.path.abspath(__file__)) + "\\ff\\bin\\ffmpeg"
+        command = [ffmpeg_cmd_path, '-i', inputPath,
+                   '-c', 'copy', outputPatn]
         subprocess.run(command)
 
         if(os.path.exists(outputPatn) == False):
