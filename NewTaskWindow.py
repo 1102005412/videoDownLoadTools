@@ -210,6 +210,20 @@ class NewTaskWindow(DownTask.TaskChangedObserver):
         task = M3u8Downloader.loadTask(path)
         if task == None:
             return
+
+        # 检查任务是否已在队列中
+        self.__queue_lock.acquire()
+        in_waiting = task.taskName in self.__waiting_queue
+        in_active = task.taskName in self.__active_queue
+        self.__queue_lock.release()
+        
+        if in_waiting or in_active:
+            if in_waiting:
+                messagebox.showinfo("提示", f"任务 '{task.taskName}' 已在等待队列中", parent=self._window)
+            else:
+                messagebox.showinfo("提示", f"任务 '{task.taskName}' 正在下载中", parent=self._window)
+            return
+
         self.__display_task(task)
     
     def __display_task(self,task):
