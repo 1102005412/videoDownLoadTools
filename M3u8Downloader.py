@@ -24,6 +24,12 @@ class M3u8Downloader:
         #     'Accept-Encoding': 'gzip, deflate'
         # }
         self._m3u8EnableTypes = [".ts",".jpg",".jpeg"]
+        self._totalDownloadSize = 0  # 总下载数据量（字节）
+        self._downloadSpeed = 0  # 实时下载速度（字节/秒）
+        self._lastDownloadSize = 0  # 上次计算速度时的下载量
+        self._lastSpeedTime = time.time()  # 上次计算速度的时间
+        self._speedThread = None  # 网速显示线程
+        self._isDownloading = False  # 下载状态标志
 
     def __get_next_task(self):
         task = []
@@ -75,7 +81,29 @@ class M3u8Downloader:
                 code.close()
                 self._downTaskLock.acquire()
                 self._finished = self._finished + 1
-                print("%s下载成功 (%d/%d)" % (task[1],self._finished,self._allNum))
+                # 累加下载数据量
+                self._totalDownloadSize += len(ret.content)
+
+                speed = self._downloadSpeed
+                total_size = self._totalDownloadSize
+
+                #格式化速度显示
+                if speed < 1024:
+                    speed_str = "%.2f B/s" % speed
+                elif speed < 1024 * 1024:
+                    speed_str = "%.2f KB/s" % (speed / 1024)
+                else:
+                    speed_str = "%.2f MB/s" % (speed / (1024 * 1024))
+            
+                # 格式化总下载量
+                if total_size < 1024:
+                    total_str = "%.2f B" % total_size
+                elif total_size < 1024 * 1024:
+                    total_str = "%.2f KB" % (total_size / 1024)
+                else:
+                    total_str = "%.2f MB" % (total_size / (1024 * 1024))
+
+                print("%s下载成功 (%d/%d) 实时网速: %s | 总下载量: %s" % (task[1], self._finished, self._allNum,speed_str, total_str))
                 self._downTaskLock.release()
 
 
@@ -84,8 +112,14 @@ class M3u8Downloader:
         self._currentIndex = 0
         self._tsList = tsList
         self._finished = 0
+        self._totalDownloadSize = 0  # 重置下载数据量
+        self._lastDownloadSize = 0
+        self._lastSpeedTime = time.time()
         outputPath = self._taskPath
         print("allNum = %d" % (self._allNum))
+
+        # 启动网速显示线程
+        self.__start_speed_thread()
 
         threadList = []
         for i in range(self._threadCount):
@@ -96,7 +130,9 @@ class M3u8Downloader:
         for t in threadList:
             t.join()
 
-        print("%s下载完成 %d/%d" % (outputPath,self._finished,self._allNum))
+        # 停止网速显示线程
+        self.__stop_speed_thread()
+        print("\n%s下载完成 %d/%d" % (outputPath,self._finished,self._allNum))
         
 
 
@@ -182,6 +218,61 @@ class M3u8Downloader:
             shutil.rmtree(fileName)
         else:
             print("%s 不存在" % (fileName))
+
+    def __show_download_speed(self):
+        """显示实时下载速度"""
+        while self._isDownloading:
+            current_time = time.time()
+            time_diff = current_time - self._lastSpeedTime
+            
+            with self._downTaskLock:
+                current_size = self._totalDownloadSize
+                size_diff = current_size - self._lastDownloadSize
+                # 只有当时间差达到10秒或有新数据下载时才更新速度和时间
+                if time_diff >= 5 and size_diff > 0:
+                    speed = size_diff / max(time_diff, 0.1)  # 避免除以0
+                    self._downloadSpeed = speed
+                    self._lastDownloadSize = current_size
+                    self._lastSpeedTime = current_time
+                # else:
+                #     speed = self._downloadSpeed
+                # total_size = self._totalDownloadSize
+                # finished = self._finished
+                # all_num = self._allNum
+            
+            # 格式化速度显示
+            # if speed < 1024:
+            #     speed_str = "%.2f B/s" % speed
+            # elif speed < 1024 * 1024:
+            #     speed_str = "%.2f KB/s" % (speed / 1024)
+            # else:
+            #     speed_str = "%.2f MB/s" % (speed / (1024 * 1024))
+            
+            # # 格式化总下载量
+            # if total_size < 1024:
+            #     total_str = "%.2f B" % total_size
+            # elif total_size < 1024 * 1024:
+            #     total_str = "%.2f KB" % (total_size / 1024)
+            # else:
+            #     total_str = "%.2f MB" % (total_size / (1024 * 1024))
+            
+            # 使用回车符覆盖当前行，实现实时更新效果
+            #print("\r实时网速: %s | 总下载量: %s | 完成: %d/%d" % (speed_str, total_str, finished, all_num), end="", flush=True)
+            
+            time.sleep(1)  # 减少CPU占用
+
+    def __start_speed_thread(self):
+        """启动网速显示线程"""
+        self._isDownloading = True
+        self._speedThread = threading.Thread(target=self.__show_download_speed)
+        self._speedThread.daemon = True  # 设为守护线程，主线程结束时自动退出
+        self._speedThread.start()
+
+    def __stop_speed_thread(self):
+        """停止网速显示线程"""
+        self._isDownloading = False
+        if self._speedThread:
+            self._speedThread.join(timeout=1)  # 等待线程结束，最多等待1秒
 
     def __combine_ts_list(self,m3u8Url):
         print("开始合并ts片段...")
