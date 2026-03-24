@@ -30,6 +30,19 @@ class M3u8Downloader:
         self._lastSpeedTime = time.time()  # 上次计算速度的时间
         self._speedThread = None  # 网速显示线程
         self._isDownloading = False  # 下载状态标志
+        self._maxFilesPerFolder = 200  # 每个文件夹存放的文件数量
+
+    def __get_sub_folder_path(self, index, files_per_folder=200):
+        """根据文件索引计算存储文件夹路径
+        Args:
+            index: 文件在列表中的索引
+            files_per_folder: 每个文件夹存放的文件数量
+            
+        Returns:
+            文件夹路径（相对于taskPath）
+        """
+        folder_index = index // files_per_folder + 1
+        return f"part{folder_index:d}"
 
     def __get_next_task(self):
         task = []
@@ -46,12 +59,13 @@ class M3u8Downloader:
                 print("%s已存在，跳过 (%d / %d)" % (fileName,self._finished,self._allNum))
                 continue
             
+            subFolderPath = self.__get_sub_folder_path(i,self._maxFilesPerFolder)
             if ts.startswith("http://") or ts.startswith("https://"):
-                task = [ts, fileName.split("/")[-1]]
+                task = [ts, fileName.split("/")[-1],subFolderPath]
             elif ts.startswith("/"):
-                task = [self.__downUrl + ts[1:], fileName.split("/")[-1]]
+                task = [self.__downUrl + ts[1:], fileName.split("/")[-1],subFolderPath]
             else:
-                task = [self.__downUrl + ts, fileName]
+                task = [self.__downUrl + ts, fileName,subFolderPath]
             hasFind = True
             self._currentIndex = i + 1
             break
@@ -76,9 +90,12 @@ class M3u8Downloader:
                 self._downTaskLock.release()
                 continue
 
-            with open(self._taskPath + "/" + task[1], "wb") as code:
+            # 确保子文件夹存在
+            os.makedirs(self._taskPath + "/" + task[2], exist_ok=True)
+            with open(self._taskPath + "/" + task[2] + "/" + task[1], "wb") as code:
                 code.write(ret.content)
-                code.close()
+                code.flush()  # 刷新 Python 缓冲区
+                os.fsync(code.fileno())  # 强制操作系统将数据写入磁盘
                 self._downTaskLock.acquire()
                 self._finished = self._finished + 1
                 # 累加下载数据量
@@ -191,6 +208,7 @@ class M3u8Downloader:
         if u3m8file == None:
             print("%s 创建失败" % (m3u8FileName))
             return None
+        currentIndex = 0
         for line in lines:
             if any(var in line for var in self._m3u8EnableTypes):
                 fileName = line.split('?')[0]
@@ -198,6 +216,10 @@ class M3u8Downloader:
                     fileName = fileName.split("/")[-1]
                 if fileName.endswith(".ts") is False:
                     fileName += ".ts"
+                subFolderPath = self.__get_sub_folder_path(currentIndex,self._maxFilesPerFolder)
+                currentIndex += 1
+                fileName = subFolderPath + "/" + fileName
+
                 u3m8file.write(fileName + "\n")
             else:
                 u3m8file.write(line + "\n")
@@ -297,7 +319,7 @@ class M3u8Downloader:
         #stream = ffmpeg.output(stream,self._outputPath + "/" + outputFile + ".mp4",c="copy")
         #ffmpeg.run(stream)
 
-        ffmpeg_cmd_path = os.path.dirname(os.path.abspath(__file__)) + "\\ff\\bin\\ffmpeg"
+        ffmpeg_cmd_path = os.path.dirname(os.path.abspath(__file__)) + "\\ffmpeg\\bin\\ffmpeg"
         command = [ffmpeg_cmd_path, '-i', inputPath,
                    '-c', 'copy', outputPatn]
         subprocess.run(command)
