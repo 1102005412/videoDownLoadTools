@@ -54,12 +54,12 @@ class M3u8Downloader:
             if fileName.endswith(".ts") is False:
                 fileName += ".ts"
 
-            if(os.path.exists(self._taskPath + "/" + fileName)):
+            subFolderPath = self.__get_sub_folder_path(i,self._maxFilesPerFolder)
+            if(os.path.exists(self._taskPath + "/" + subFolderPath + "/" + fileName)):
                 self._finished = self._finished + 1
                 print("%s已存在，跳过 (%d / %d)" % (fileName,self._finished,self._allNum))
                 continue
-            
-            subFolderPath = self.__get_sub_folder_path(i,self._maxFilesPerFolder)
+
             if ts.startswith("http://") or ts.startswith("https://"):
                 task = [ts, fileName.split("/")[-1],subFolderPath]
             elif ts.startswith("/"):
